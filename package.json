@@ -24,7 +24,7 @@
   "scripts": {
     "build": "node build.mjs",
     "install:plugin": "node scripts/install.mjs",
-    "test": "node --test test/"
+    "test": "node --test"
   },
   "peerDependencies": {
     "react": "^18.2.0",
