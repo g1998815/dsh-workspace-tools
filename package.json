@@ -1,0 +1,45 @@
+{
+  "name": "dsh-workspace-tools",
+  "version": "0.1.0",
+  "description": "DSH 第三方插件：Git Diff 变更列表 / 文件浏览器 / PTY 控制台",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": { "default": "./lib/index.js" },
+    "./client": { "default": "./client.js" },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-input-trigger",
+        "@deepseek-ai/dsh-client-connection"
+      ]
+    }
+  },
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "install:plugin": "node scripts/install.mjs",
+    "test": "node --test test/"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-terminal": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-subprocess": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-fs": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-host-webserver": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-connection": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-input-trigger": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-workspace": "0.1.0-rc.6"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
