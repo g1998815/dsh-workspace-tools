@@ -37,7 +37,18 @@ test("listDir: nested relative path works", async () => {
 });
 
 test("listDir: missing dir rejects dir-not-found", async () => {
-  await assert.rejects(listDir("/nonexistent-dshwt", ""), (e) => e.code === "dir-not-found");
+  await assert.rejects(listDir(join(tmpdir(), `dshwt-nonexistent-${Date.now()}`), ""), (e) => e.code === "dir-not-found");
+});
+
+test("listDir: sibling directory literally named ..foo is allowed", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "dshwt-fs-"));
+  try {
+    mkdirSync(join(dir, "..foo"));
+    const { entries } = await listDir(dir, "..foo");
+    assert.deepEqual(entries, []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("listDir: path escape rejected", async () => {
@@ -50,6 +61,6 @@ test("listDir: path escape rejected", async () => {
 });
 
 test("resolvePath: returns normalized absolute path", () => {
-  const dir = "/tmp/dshwt/root";
-  assert.equal(resolvePath(dir, "sub/a.txt").absolute, "/tmp/dshwt/root/sub/a.txt");
+  const root = join(tmpdir(), "dshwt", "root");
+  assert.equal(resolvePath(root, "sub/a.txt").absolute, join(root, "sub", "a.txt"));
 });

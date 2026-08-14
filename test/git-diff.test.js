@@ -64,6 +64,53 @@ test("getDiff: untracked file returns full-added view", async () => {
   }
 });
 
+test("listChanges: rename reports status R with oldPath", async () => {
+  const repo = makeRepo();
+  try {
+    repo.git(["mv", "a.txt", "b.txt"]);
+    const { changes } = await listChanges(repo.dir);
+    assert.equal(changes.length, 1);
+    const r = changes[0];
+    assert.equal(r.status, "R");
+    assert.equal(r.path, "b.txt");
+    assert.equal(r.oldPath, "a.txt");
+    assert.equal(r.untracked, false);
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test("listChanges: rename + edit normalizes composite status to R", async () => {
+  const repo = makeRepo();
+  try {
+    repo.git(["mv", "a.txt", "b.txt"]);
+    writeFileSync(join(repo.dir, "b.txt"), "line1\nline2\nEDITED\n");
+    repo.git(["add", "b.txt"]);
+    const { changes } = await listChanges(repo.dir);
+    assert.equal(changes.length, 1); // 复合状态（RM/RD…）不得产生垃圾条目
+    const r = changes[0];
+    assert.equal(r.status, "R");
+    assert.equal(r.path, "b.txt");
+    assert.equal(r.oldPath, "a.txt");
+    assert.equal(r.untracked, false);
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test("getDiff: untracked path escaping cwd rejects path-escape", async () => {
+  const repo = makeRepo();
+  const name = `outside-${Date.now()}.txt`;
+  const outside = join(repo.dir, "..", name);
+  try {
+    writeFileSync(outside, "secret\n");
+    await assert.rejects(getDiff(repo.dir, `../${name}`, { untracked: true }), (e) => e.code === "path-escape");
+  } finally {
+    rmSync(outside, { force: true });
+    repo.cleanup();
+  }
+});
+
 test("getDiff: non-repo dir rejects not-a-repo", async () => {
   const dir = mkdtempSync(join(tmpdir(), "dshwt-norepo-"));
   try {

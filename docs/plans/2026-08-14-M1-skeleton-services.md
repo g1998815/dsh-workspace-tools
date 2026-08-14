@@ -108,6 +108,9 @@
 
 ```
 client.js
+# 构建产物与含私有 peer 记录的 lockfile（无复现价值，不提交）
+client.js.map
+package-lock.json
 ```
 
 - [ ] **Step 3: 写 README.md**
@@ -418,7 +421,7 @@ function parsePorcelainZ(buf) {
     const xy = head.slice(0, 2).replace(/ /g, "");
     const path = head.slice(3); // "XY " 之后为路径（-z 模式原始字节、不引用）
     const untracked = xy === "??";
-    if (xy === "R" || xy === "C") {
+    if (xy.startsWith("R") || xy.startsWith("C")) {
       items.push({ status: xy, path, oldPath: parts[i + 1] ?? "", untracked: false });
       i += 2;
     } else {
@@ -556,15 +559,18 @@ Expected: FAIL（模块不存在）。
 ```js
 // lib/services/workspace-fs.js
 import { readdir, stat } from "node:fs/promises";
-import { join, relative, resolve, sep } from "node:path";
+import { join, parse, relative, resolve, sep } from "node:path";
 
 const HIDDEN = new Set([".git", ".DS_Store"]);
 
-function assertInside(cwd, relPath) {
+export function assertInside(cwd, relPath) {
   if (relPath === "" || relPath === ".") return cwd;
   const target = resolve(cwd, relPath);
+  if (parse(target).root !== parse(cwd).root) {
+    throw { code: "path-escape", message: "路径越出工作区" };
+  }
   const rel = relative(cwd, target);
-  if (rel.startsWith("..") || (rel !== "" && rel.startsWith(`..${sep}`))) {
+  if (rel !== "" && (rel === ".." || rel.startsWith(`..${sep}`))) {
     throw { code: "path-escape", message: "路径越出工作区" };
   }
   return target;
@@ -1031,7 +1037,7 @@ git commit -m "test: add CLI smoke verification for M1"
 
 - [ ] `npm install && node build.mjs && node scripts/install.mjs` 在 macOS 可重复执行（幂等）。
 - [ ] `cordis.patch.yml` 追加 `- insert: { id: dsh-workspace-tools, name: 'dsh-workspace-tools' }`，`cordis.yml` 未被修改。
-- [ ] `node --test test/` 全绿（gitDiff 4 例、workspaceFs 5 例、console 4 例：detectShell 2 + createShellSession 2）。
+- [ ] `node --test` 全绿（gitDiff 4 例、workspaceFs 5 例、console 4 例：detectShell 2 + createShellSession 2）。
 - [ ] `node scripts/smoke.mjs` 在 git 仓库与非 git 目录均输出正确结果（含 `not-a-repo` 结构化错误）。
 - [ ] Task 7 Step 3 核对点定稿（§12 双报告已并入：inject 服务名 / RPC channel / cwd 来源 / `dsh.client` 字段同步 Task 1）。
 - [ ] 重启 DSH 服务后插件行出现在 profile 插件清单（可选验证，若环境允许）。
