@@ -422,7 +422,7 @@ function parsePorcelainZ(buf) {
     const path = head.slice(3); // "XY " 之后为路径（-z 模式原始字节、不引用）
     const untracked = xy === "??";
     if (xy.startsWith("R") || xy.startsWith("C")) {
-      items.push({ status: xy, path, oldPath: parts[i + 1] ?? "", untracked: false });
+      items.push({ status: xy[0], path, oldPath: parts[i + 1] ?? "", untracked: false });
       i += 2;
     } else {
       const status = untracked ? "??" : xy[0] || xy;
@@ -544,8 +544,8 @@ test("listDir: path escape rejected", async () => {
 });
 
 test("resolvePath: returns normalized absolute path", () => {
-  const dir = "/tmp/dshwt/root";
-  assert.equal(resolvePath(dir, "sub/a.txt").absolute, "/tmp/dshwt/root/sub/a.txt");
+  const dir = join(tmpdir(), "dshwt-root");
+  assert.equal(resolvePath(dir, "sub/a.txt").absolute, join(dir, "sub", "a.txt"));
 });
 ```
 
