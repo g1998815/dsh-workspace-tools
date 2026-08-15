@@ -90,3 +90,67 @@ test("fs.listDir: 未知 endpoint → bad-request", async () => {
   const res = await handler("nope.op", {});
   assert.equal(res.error.code, "bad-request");
 });
+
+// ── M3b 预览端点（fs.readText / fs.readImage）集成测试 ──
+// fake 复刻 dsh-fs-local 契约：resolve 返回 {targetKey, displayPath}（opts.cwd 必须字符串）、
+// stat 返回 {size}、readText/readBytes 返回内容。
+function previewFs({ size = 100, text = "hello", bytes = Buffer.from("abc") } = {}) {
+  return {
+    resolve: async (p, o) => {
+      if (o?.cwd !== undefined && typeof o.cwd !== "string") throw new TypeError("paths[0] must be string");
+      const base = o?.cwd ?? "/w";
+      const abs = p.startsWith("/") ? p : `${base}/${p}`;
+      return { targetKey: abs, displayPath: abs };
+    },
+    processPath: (t) => String(t.targetKey),
+    stat: async () => ({ size, type: "file", version: "v1" }),
+    readText: async () => text,
+    readBytes: async () => bytes,
+  };
+}
+
+test("fs.readText: 文本 happy path → ok({text})", async () => {
+  const { handler, sessions } = captureHandler(previewFs());
+  sessions.set("s1", { header: { cwd: "/w" } });
+  const res = await handler("fs.readText", { cwd: "/w", file: "a.md", sessionId: "s1" });
+  assert.equal(res.ok, true);
+  assert.deepEqual(res.value, { text: "hello" });
+});
+
+test("fs.readText: 非文本扩展名 → bad-request（readText 不被调用）", async () => {
+  let readCalled = false;
+  const { handler, sessions } = captureHandler({ ...previewFs(), readText: async () => { readCalled = true; return ""; } });
+  sessions.set("s1", { header: { cwd: "/w" } });
+  const res = await handler("fs.readText", { cwd: "/w", file: "a.zip", sessionId: "s1" });
+  assert.equal(res.ok, false);
+  assert.equal(res.error.code, "bad-request");
+  assert.equal(readCalled, false);
+});
+
+test("fs.readText: 超过文本上限 → bad-request 文件过大", async () => {
+  let readCalled = false;
+  const { handler, sessions } = captureHandler({ ...previewFs({ size: 300 * 1024 }), readText: async () => { readCalled = true; return ""; } });
+  sessions.set("s1", { header: { cwd: "/w" } });
+  const res = await handler("fs.readText", { cwd: "/w", file: "big.md", sessionId: "s1" });
+  assert.equal(res.ok, false);
+  assert.equal(res.error.code, "bad-request");
+  assert.match(res.error.message, /过大/);
+  assert.equal(readCalled, false);
+});
+
+test("fs.readImage: 图片 happy path → ok({base64})", async () => {
+  const { handler, sessions } = captureHandler(previewFs({ bytes: Buffer.from("abc") }));
+  sessions.set("s1", { header: { cwd: "/w" } });
+  const res = await handler("fs.readImage", { cwd: "/w", file: "a.png", sessionId: "s1" });
+  assert.equal(res.ok, true);
+  assert.equal(res.value.base64, Buffer.from("abc").toString("base64"));
+});
+
+test("fs.readImage: 超过图片上限 → bad-request 图片过大", async () => {
+  const { handler, sessions } = captureHandler(previewFs({ size: 6 * 1024 * 1024 }));
+  sessions.set("s1", { header: { cwd: "/w" } });
+  const res = await handler("fs.readImage", { cwd: "/w", file: "big.png", sessionId: "s1" });
+  assert.equal(res.ok, false);
+  assert.equal(res.error.code, "bad-request");
+  assert.match(res.error.message, /过大/);
+});

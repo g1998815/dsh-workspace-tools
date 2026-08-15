@@ -448,15 +448,15 @@ git commit -m "feat: file preview window (text w/ search, image) on tree click"
 
 ## 里程碑验收清单（M3b 文件预览）
 
-- [ ] `node --test` 全绿（55 用例：51 + file-preview 4）。
+- [x] `node --test` 全绿（**60 用例**：51 + file-preview 4 + rpc-integration 5）。
 - [ ] **host 端需重启 harness 生效**（lib/index.js 新增端点）；重启后确认 `fs.readText`/`fs.readImage` RPC（curl 探测）。
-- [ ] client.js 重建提交；harness curl 含 `data-wt-preview-window`。
+- [x] client.js 重建提交（45KB）；harness curl 含 `data-wt-preview-window`。
 - [ ] GUI 手动验收：
   - [ ] 文件页签点击 `.md`/`.js`/`.json` 等文本 → 浮窗等宽预览 + 搜索高亮/跳转。
   - [ ] 点击 `.png`/`.svg` 图片 → 浮窗显示图片。
   - [ ] 浮窗标题栏可拖拽；Esc/✕ 关闭；换文件切换内容。
   - [ ] 点击非白名单文件（如 `.zip`）仍保持"仅选中"。
-- [ ] 推送至 GitHub 私有仓库 main。
+- [x] 推送至 GitHub 私有仓库 main。
 
 ## 后续（非 M3b 范围）
 
