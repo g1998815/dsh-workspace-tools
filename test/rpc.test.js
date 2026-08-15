@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { RPC_CHANNEL, WS_PATH } from "../lib/constants.js";
-import { ok, fail, failFrom, assertCwdMatchesSession } from "../lib/rpc.js";
+import { ok, fail, failFrom, checkCwdGuard } from "../lib/rpc.js";
 
 test("constants: RPC_CHANNEL 为单级路径且非保留字", () => {
   assert.match(RPC_CHANNEL, /^\/[A-Za-z0-9._~-]+$/); // CHANNEL_PATTERN
@@ -32,8 +32,16 @@ test("failFrom: 无 code 的异常也能映射", () => {
   assert.match(e.error.message, /kaboom/);
 });
 
-test("assertCwdMatchesSession: 匹配通过 / 不匹配抛 cwd-mismatch / 无 header 跳过", () => {
-  assert.doesNotThrow(() => assertCwdMatchesSession("/a/b", "/a/b"));
-  assert.doesNotThrow(() => assertCwdMatchesSession(undefined, "/a/b"));
-  assert.throws(() => assertCwdMatchesSession("/a/b", "/a/c"), (err) => err.code === "cwd-mismatch");
+test("checkCwdGuard: ok / conflict / session-not-found / missing-session-id 分派", () => {
+  const session = { header: { cwd: "/a/b" } };
+  assert.deepEqual(checkCwdGuard(session, { sessionId: "s1", cwd: "/a/b" }), { status: "ok" });
+  assert.deepEqual(checkCwdGuard(session, { sessionId: "s1", cwd: "/a/c" }), {
+    status: "conflict",
+    requestedCwd: "/a/c",
+    existingCwd: "/a/b",
+  });
+  assert.deepEqual(checkCwdGuard(undefined, { sessionId: "s1", cwd: "/a/b" }), { status: "session-not-found" });
+  assert.deepEqual(checkCwdGuard(session, { cwd: "/a/b" }), { status: "missing-session-id" });
+  assert.deepEqual(checkCwdGuard(session, { sessionId: "", cwd: "/a/b" }), { status: "missing-session-id" });
+  assert.deepEqual(checkCwdGuard(session, undefined), { status: "missing-session-id" });
 });
