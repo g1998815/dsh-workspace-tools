@@ -768,6 +768,23 @@ function parseDiff(text) {
   return lines;
 }
 
+// src/lib/git-history-client.js
+function relativeTime(iso, now = Date.now()) {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "";
+  const diff = Math.max(0, now - t);
+  const min = Math.floor(diff / 6e4);
+  if (min < 1) return "\u521A\u521A";
+  if (min < 60) return `${min} \u5206\u949F\u524D`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} \u5C0F\u65F6\u524D`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day} \u5929\u524D`;
+  const mon = Math.floor(day / 30);
+  if (mon < 12) return `${mon} \u4E2A\u6708\u524D`;
+  return `${Math.floor(mon / 12)} \u5E74\u524D`;
+}
+
 // src/components/diff-window.js
 var import_jsx_runtime5 = require("react/jsx-runtime");
 var import_react4 = require("react");
@@ -881,7 +898,17 @@ var STATUS_COLOR = {
   A: "#7ec699",
   R: "#61afef"
 };
-function Changes({ cwd, sessionId, rpc }) {
+var BTN2 = {
+  background: "var(--dsw-alias-bg-float, #1f1f1f)",
+  border: "1px solid var(--dsw-alias-border-l2, #444)",
+  borderRadius: 4,
+  color: "var(--dsw-alias-text-primary, #ddd)",
+  cursor: "pointer",
+  padding: "2px 8px",
+  fontSize: 12,
+  flexShrink: 0
+};
+function Changes({ cwd, sessionId, rpc, onCountChange }) {
   const [groups, setGroups] = (0, import_react5.useState)([]);
   const [status, setStatus] = (0, import_react5.useState)("loading");
   const [error, setError] = (0, import_react5.useState)(null);
@@ -889,27 +916,74 @@ function Changes({ cwd, sessionId, rpc }) {
   const [selected, setSelected] = (0, import_react5.useState)(null);
   const [diffLines, setDiffLines] = (0, import_react5.useState)(null);
   const [diffError, setDiffError] = (0, import_react5.useState)(null);
+  const [checked, setChecked] = (0, import_react5.useState)(() => /* @__PURE__ */ new Set());
+  const [commitMsg, setCommitMsg] = (0, import_react5.useState)("");
+  const [showRecent, setShowRecent] = (0, import_react5.useState)(false);
+  const [recentMessages, setRecentMessages] = (0, import_react5.useState)([]);
+  const [branch, setBranch] = (0, import_react5.useState)("");
+  const [commits, setCommits] = (0, import_react5.useState)([]);
+  const [histStatus, setHistStatus] = (0, import_react5.useState)("loading");
+  const [histError, setHistError] = (0, import_react5.useState)(null);
+  const [selCommit, setSelCommit] = (0, import_react5.useState)(null);
+  const [confirmReset, setConfirmReset] = (0, import_react5.useState)(false);
+  const [splitPct, setSplitPct] = (0, import_react5.useState)(50);
+  const [previewLines, setPreviewLines] = (0, import_react5.useState)(null);
   const load = (0, import_react5.useCallback)(() => {
     if (!cwd) {
       setGroups([]);
+      setCommits([]);
+      setRecentMessages([]);
+      setBranch("");
       setStatus("ready");
+      setHistStatus("ready");
+      setError(null);
+      setHistError(null);
+      onCountChange?.(0);
       return;
     }
     setStatus("loading");
-    callRpc(rpc, "git.listChanges", { cwd, sessionId }).then((value) => {
-      setGroups(groupByDir(normalizeChanges(value.changes)));
+    setHistStatus("loading");
+    setHistError(null);
+    Promise.all([
+      callRpc(rpc, "git.listChanges", { cwd, sessionId }),
+      callRpc(rpc, "git.branch", { cwd, sessionId }),
+      callRpc(rpc, "git.log", { cwd, sessionId, limit: 50 })
+    ]).then(([changesVal, branchVal, logVal]) => {
+      const changes = normalizeChanges(changesVal.changes);
+      setGroups(groupByDir(changes));
+      setBranch(branchVal.branch ?? "");
+      const log = logVal.commits ?? [];
+      setCommits(log);
+      setRecentMessages(log.slice(0, 5).map((c) => c.subject));
+      setChecked((prev) => {
+        if (prev.size === 0) return prev;
+        const next = /* @__PURE__ */ new Set();
+        for (const c of changes) if (prev.has(c.path)) next.add(c.path);
+        return next;
+      });
       setStatus("ready");
       setError(null);
+      setHistStatus("ready");
+      onCountChange?.(changes.length);
     }).catch((err) => {
+      const msg = String(err?.message ?? err);
       setStatus("error");
-      setError(String(err?.message ?? err));
+      setError(msg);
+      setHistStatus("error");
+      setHistError(msg);
     });
-  }, [cwd, rpc, sessionId]);
+  }, [cwd, rpc, sessionId, onCountChange]);
   (0, import_react5.useEffect)(() => {
     setSelected(null);
     setDiffLines(null);
     setDiffError(null);
+    setPreviewLines(null);
     setCollapsed(/* @__PURE__ */ new Set());
+    setChecked(/* @__PURE__ */ new Set());
+    setCommitMsg("");
+    setShowRecent(false);
+    setSelCommit(null);
+    setConfirmReset(false);
     load();
   }, [load]);
   const openFile = (0, import_react5.useCallback)(
@@ -929,7 +1003,95 @@ function Changes({ cwd, sessionId, rpc }) {
       return next;
     });
   }, []);
+  const toggleChecked = (0, import_react5.useCallback)((path) => {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
   const rows = (0, import_react5.useMemo)(() => visibleRows2(groups, collapsed), [groups, collapsed]);
+  const commitSelected = (0, import_react5.useCallback)(() => {
+    const files = [...checked];
+    if (files.length === 0) return;
+    callRpc(rpc, "git.commit", { cwd, sessionId, message: commitMsg.trim(), files }).then(() => {
+      setChecked(/* @__PURE__ */ new Set());
+      setCommitMsg("");
+      setShowRecent(false);
+      setError(null);
+      load();
+    }).catch((err) => {
+      setStatus("error");
+      setError(String(err?.message ?? err));
+    });
+  }, [cwd, rpc, sessionId, checked, commitMsg, load]);
+  const commitAll = (0, import_react5.useCallback)(() => {
+    callRpc(rpc, "git.commit", { cwd, sessionId, message: commitMsg.trim() }).then(() => {
+      setChecked(/* @__PURE__ */ new Set());
+      setCommitMsg("");
+      setShowRecent(false);
+      setError(null);
+      load();
+    }).catch((err) => {
+      setStatus("error");
+      setError(String(err?.message ?? err));
+    });
+  }, [cwd, rpc, sessionId, commitMsg, load]);
+  const previewSelected = (0, import_react5.useCallback)(() => {
+    const files = [...checked];
+    if (files.length === 0) return;
+    const meta = /* @__PURE__ */ new Map();
+    for (const g of groups) for (const c of g.items) meta.set(c.path, c);
+    setSelected({ path: `\u9884\u89C8 ${files.length} \u4E2A\u6587\u4EF6`, untracked: false, preview: true });
+    setPreviewLines(null);
+    setDiffError(null);
+    Promise.all(
+      files.map(
+        (file) => callRpc(rpc, "git.getDiff", { cwd, file, untracked: meta.get(file)?.untracked ?? false, sessionId }).then((value) => ({ file, lines: parseDiff(value.diff) })).catch((err) => ({ file, lines: [{ kind: "meta", text: `\uFF08\u8BFB\u53D6\u5931\u8D25\uFF1A${err?.message ?? err}\uFF09`, oldLine: null, newLine: null }] }))
+      )
+    ).then((results) => {
+      const lines = [];
+      for (const r of results) {
+        lines.push({ kind: "meta", text: `--- ${r.file} ---`, oldLine: null, newLine: null });
+        lines.push(...r.lines);
+      }
+      setPreviewLines(lines);
+    });
+  }, [checked, cwd, groups, rpc, sessionId]);
+  const doReset = (0, import_react5.useCallback)(() => {
+    if (!selCommit) return;
+    if (!confirmReset) {
+      setConfirmReset(true);
+      return;
+    }
+    callRpc(rpc, "git.reset", { cwd, sessionId, target: selCommit.hash }).then(() => {
+      setSelCommit(null);
+      setConfirmReset(false);
+      setHistError(null);
+      setError(null);
+      load();
+    }).catch((err) => {
+      setHistStatus("error");
+      setHistError(String(err?.message ?? err));
+    });
+  }, [cwd, rpc, sessionId, selCommit, confirmReset, load]);
+  const onSplitDown = (0, import_react5.useCallback)((e) => {
+    const el = e.currentTarget.parentElement;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const move = (ev) => {
+      if (rect.height <= 0) return;
+      const pct = (ev.clientY - rect.top) / rect.height * 100;
+      setSplitPct(Math.min(80, Math.max(20, pct)));
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  }, []);
   let list;
   if (status === "loading") {
     list = (0, import_jsx_runtime6.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
@@ -975,6 +1137,15 @@ function Changes({ cwd, sessionId, rpc }) {
             background: selected?.path === row.path ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
           },
           children: [
+            (0, import_jsx_runtime6.jsx)("input", {
+              type: "checkbox",
+              "data-wt-check": true,
+              checked: checked.has(row.path),
+              onChange: () => toggleChecked(row.path),
+              onClick: (e) => e.stopPropagation(),
+              // 勾选不触发行点击（打开 diff）
+              style: { flexShrink: 0, margin: 0, accentColor: "var(--dsw-alias-accent, #4f8cff)" }
+            }),
             (0, import_jsx_runtime6.jsx)("span", {
               style: {
                 width: 20,
@@ -994,37 +1165,236 @@ function Changes({ cwd, sessionId, rpc }) {
       )
     });
   }
+  let history;
+  if (histStatus === "loading") {
+    history = (0, import_jsx_runtime6.jsx)("div", { style: { padding: 10, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u5386\u53F2\u2026" });
+  } else if (histStatus === "error") {
+    history = (0, import_jsx_runtime6.jsx)("div", { "data-wt-history-error": true, style: { padding: 10, color: "#e06c75" }, children: histError });
+  } else if (commits.length === 0) {
+    history = (0, import_jsx_runtime6.jsx)("div", { style: { padding: 10, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u6CA1\u6709\u63D0\u4EA4\u8BB0\u5F55" });
+  } else {
+    history = (0, import_jsx_runtime6.jsx)("div", {
+      "data-wt-history-list": true,
+      children: commits.map(
+        (c) => (0, import_jsx_runtime6.jsx)("div", {
+          key: c.hash,
+          "data-wt-history-row": true,
+          "data-selected": selCommit?.hash === c.hash || void 0,
+          onClick: () => {
+            setSelCommit(c);
+            setConfirmReset(false);
+          },
+          style: {
+            padding: "4px 10px",
+            cursor: "pointer",
+            display: "flex",
+            gap: 6,
+            alignItems: "center",
+            background: selCommit?.hash === c.hash ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
+          },
+          children: [
+            (0, import_jsx_runtime6.jsx)("span", { style: { color: "#e6b450", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flexShrink: 0 }, children: c.shortHash }),
+            (0, import_jsx_runtime6.jsx)("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: c.subject }),
+            (0, import_jsx_runtime6.jsx)("span", { style: { flexShrink: 0, color: "var(--dsw-alias-text-secondary, #999)", fontSize: 11 }, children: relativeTime(c.date) })
+          ]
+        })
+      )
+    });
+  }
+  const resetBar = selCommit ? (0, import_jsx_runtime6.jsx)("div", {
+    "data-wt-reset-bar": true,
+    style: {
+      padding: "6px 10px",
+      borderTop: "1px solid var(--dsw-alias-border-l2, #333)",
+      display: "flex",
+      flexDirection: "column",
+      gap: 4,
+      flexShrink: 0,
+      background: "var(--dsw-alias-bg-base, #1a1a1a)"
+    },
+    children: [
+      (0, import_jsx_runtime6.jsx)("button", {
+        type: "button",
+        "data-wt-reset": true,
+        onClick: doReset,
+        style: {
+          padding: "5px 10px",
+          borderRadius: 4,
+          border: "none",
+          cursor: "pointer",
+          fontWeight: 600,
+          fontSize: 12,
+          color: "#fff",
+          background: confirmReset ? "#c0392b" : "#555"
+          // 默认灰，确认时变红
+        },
+        children: confirmReset ? "\u786E\u8BA4\u56DE\u9000\uFF1F" : `\u56DE\u9000\u5230 ${selCommit.shortHash}`
+      }),
+      (0, import_jsx_runtime6.jsx)("div", {
+        "data-wt-reset-warn": true,
+        style: { color: "#e6b450", fontSize: 11, lineHeight: 1.4 },
+        children: "\u82E5\u8BE5\u63D0\u4EA4\u5DF2\u63A8\u9001\uFF0C\u56DE\u9000\u540E\u91CD\u65B0\u63A8\u9001\u9700 force"
+      })
+    ]
+  }) : null;
+  const n = checked.size;
+  const msgEmpty = commitMsg.trim() === "";
+  const toolRow = (0, import_jsx_runtime6.jsx)("div", {
+    style: { position: "relative", flexShrink: 0 },
+    children: [
+      (0, import_jsx_runtime6.jsx)("div", {
+        "data-wt-tools": true,
+        style: { display: "flex", gap: 4, padding: "4px 6px", alignItems: "center", flexWrap: "wrap" },
+        children: [
+          (0, import_jsx_runtime6.jsx)("input", {
+            type: "text",
+            "data-wt-commit-msg": true,
+            placeholder: "\u63D0\u4EA4\u6D88\u606F\u2026",
+            value: commitMsg,
+            onChange: (e) => setCommitMsg(e.target.value),
+            style: {
+              flex: "1 1 120px",
+              minWidth: 100,
+              background: "var(--dsw-alias-bg-base, #141414)",
+              border: "1px solid var(--dsw-alias-border-l2, #333)",
+              borderRadius: 4,
+              color: "var(--dsw-alias-text-primary, #ddd)",
+              padding: "3px 8px",
+              fontSize: 12,
+              outline: "none"
+            }
+          }),
+          (0, import_jsx_runtime6.jsx)("button", {
+            type: "button",
+            "data-wt-recent": true,
+            title: "\u6700\u8FD1\u63D0\u4EA4\u6D88\u606F",
+            onClick: () => setShowRecent((v) => !v),
+            style: { ...BTN2, color: "var(--dsw-alias-text-secondary, #999)" },
+            children: "\u25BE \u6700\u8FD1"
+          }),
+          (0, import_jsx_runtime6.jsx)("button", {
+            type: "button",
+            "data-wt-commit-selected": true,
+            disabled: n === 0 || msgEmpty,
+            onClick: commitSelected,
+            style: { ...BTN2, opacity: n === 0 || msgEmpty ? 0.45 : 1, cursor: n === 0 || msgEmpty ? "default" : "pointer" },
+            children: `\u63D0\u4EA4\u9009\u4E2D(${n})`
+          }),
+          (0, import_jsx_runtime6.jsx)("button", {
+            type: "button",
+            "data-wt-commit-all": true,
+            onClick: commitAll,
+            style: BTN2,
+            children: "\u5168\u90E8\u63D0\u4EA4"
+          }),
+          (0, import_jsx_runtime6.jsx)("button", {
+            type: "button",
+            "data-wt-preview-selected": true,
+            disabled: n === 0,
+            onClick: previewSelected,
+            style: { ...BTN2, opacity: n === 0 ? 0.45 : 1, cursor: n === 0 ? "default" : "pointer" },
+            children: `\u9884\u89C8(${n})`
+          })
+        ]
+      }),
+      showRecent && (0, import_jsx_runtime6.jsx)("div", {
+        "data-wt-recent-list": true,
+        style: {
+          position: "absolute",
+          top: "100%",
+          left: 6,
+          right: 6,
+          zIndex: 10,
+          background: "var(--dsw-alias-bg-float, #1f1f1f)",
+          border: "1px solid var(--dsw-alias-border-l2, #333)",
+          borderRadius: 6,
+          boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
+          maxHeight: 160,
+          overflow: "auto"
+        },
+        children: recentMessages.length === 0 ? (0, import_jsx_runtime6.jsx)("div", { style: { padding: "6px 10px", color: "var(--dsw-alias-text-secondary, #999)", fontSize: 12 }, children: "\uFF08\u6682\u65E0\u6700\u8FD1\u6D88\u606F\uFF09" }) : recentMessages.map(
+          (m, i) => (0, import_jsx_runtime6.jsx)("div", {
+            key: i,
+            "data-wt-recent-item": true,
+            onClick: () => {
+              setCommitMsg(m);
+              setShowRecent(false);
+            },
+            style: {
+              padding: "5px 10px",
+              cursor: "pointer",
+              fontSize: 12,
+              color: "var(--dsw-alias-text-primary, #ddd)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            },
+            children: m
+          })
+        )
+      })
+    ]
+  });
+  const infoRow = (0, import_jsx_runtime6.jsx)("div", {
+    "data-wt-info": true,
+    style: { display: "flex", alignItems: "center", gap: 6, padding: "2px 6px", flexShrink: 0, color: "var(--dsw-alias-text-secondary, #999)", fontSize: 12 },
+    children: [
+      (0, import_jsx_runtime6.jsx)("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: `\u{1F4CC} ${branch || "detached"}` }),
+      (0, import_jsx_runtime6.jsx)("button", {
+        type: "button",
+        "data-wt-refresh": true,
+        onClick: load,
+        style: { background: "none", border: "none", cursor: "pointer", color: "var(--dsw-alias-text-secondary, #999)", fontSize: 12, padding: "2px 8px" },
+        children: "\u21BB \u5237\u65B0"
+      })
+    ]
+  });
+  const upperPane = (0, import_jsx_runtime6.jsx)("div", {
+    "data-wt-upper": true,
+    style: { height: `${splitPct}%`, minHeight: 0, flexShrink: 0, display: "flex", flexDirection: "column" },
+    children: [
+      toolRow,
+      (0, import_jsx_runtime6.jsx)("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: list })
+    ]
+  });
+  const splitBar = (0, import_jsx_runtime6.jsx)("div", {
+    "data-wt-split": true,
+    onMouseDown: onSplitDown,
+    title: "\u62D6\u62FD\u8C03\u6574\u4E0A\u4E0B\u6BD4\u4F8B",
+    style: { height: 5, flexShrink: 0, cursor: "row-resize", background: "var(--dsw-alias-border-l2, #333)" }
+  });
+  const lowerPane = (0, import_jsx_runtime6.jsx)("div", {
+    "data-wt-history": true,
+    style: {
+      flex: 1,
+      minHeight: 0,
+      overflow: "auto",
+      display: "flex",
+      flexDirection: "column",
+      borderTop: "1px solid var(--dsw-alias-border-l2, #333)"
+    },
+    children: [(0, import_jsx_runtime6.jsx)("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: history }), resetBar]
+  });
   let diffWindow = null;
   if (selected) {
+    const isPreview = !!selected.preview;
     diffWindow = (0, import_jsx_runtime6.jsx)(DiffWindow, {
       file: selected.path,
       untracked: selected.untracked,
-      diffLines,
-      diffError,
+      diffLines: isPreview ? previewLines : diffLines,
+      diffError: isPreview ? null : diffError,
       onClose: () => {
         setSelected(null);
         setDiffLines(null);
         setDiffError(null);
+        setPreviewLines(null);
       }
     });
   }
   return (0, import_jsx_runtime6.jsx)("div", {
     "data-wt-changes": true,
     style: { display: "flex", flexDirection: "column", height: "100%", minHeight: 0 },
-    children: [
-      (0, import_jsx_runtime6.jsx)("div", {
-        style: { display: "flex", justifyContent: "flex-end", padding: "2px 6px", flexShrink: 0 },
-        children: (0, import_jsx_runtime6.jsx)("button", {
-          type: "button",
-          "data-wt-refresh": true,
-          onClick: load,
-          style: { background: "none", border: "none", cursor: "pointer", color: "var(--dsw-alias-text-secondary, #999)", fontSize: "12px", padding: "2px 8px" },
-          children: "\u21BB \u5237\u65B0"
-        })
-      }),
-      (0, import_jsx_runtime6.jsx)("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: list }),
-      diffWindow
-    ]
+    children: [infoRow, upperPane, splitBar, lowerPane, diffWindow]
   });
 }
 
@@ -1037,8 +1407,19 @@ var TABS = [
 function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
   const [open, setOpen] = (0, import_react6.useState)(true);
   const [tab, setTab] = (0, import_react6.useState)("files");
+  const [railW, setRailW] = (0, import_react6.useState)(300);
+  const [changeCount, setChangeCount] = (0, import_react6.useState)(0);
   const current = useSessions((s) => s.current);
   const cwd = useSessions((s) => s.current ? s.byId[s.current]?.cwd : void 0);
+  const onResizeDown = (0, import_react6.useCallback)((e) => {
+    const move = (ev) => setRailW(Math.min(600, Math.max(200, window.innerWidth - ev.clientX)));
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  }, []);
   return (0, import_jsx_runtime7.jsx)("div", {
     "data-wt-rail": true,
     style: {
@@ -1046,12 +1427,26 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
       right: 0,
       top: 0,
       bottom: 0,
+      width: railW,
       display: "flex",
       zIndex: 5,
       fontSize: "13px",
       color: "var(--dsw-alias-text-primary, #ddd)"
     },
     children: [
+      // 宽度拖拽把手（rail 首子元素）
+      (0, import_jsx_runtime7.jsx)("div", {
+        "data-wt-resize": true,
+        onMouseDown: onResizeDown,
+        title: "\u62D6\u62FD\u8C03\u6574\u5BBD\u5EA6",
+        style: {
+          width: 4,
+          flexShrink: 0,
+          cursor: "col-resize",
+          background: "var(--dsw-alias-bg-float, #1f1f1f)",
+          borderLeft: "1px solid var(--dsw-alias-border-l2, #333)"
+        }
+      }),
       // 收展按钮（面板左侧窄条）
       (0, import_jsx_runtime7.jsx)("button", {
         type: "button",
@@ -1077,7 +1472,8 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
       open && (0, import_jsx_runtime7.jsx)("div", {
         "data-wt-panel": true,
         style: {
-          width: 300,
+          flex: 1,
+          minWidth: 0,
           background: "var(--dsw-alias-bg-base, #1a1a1a)",
           borderLeft: "1px solid var(--dsw-alias-border-l2, #333)",
           display: "flex",
@@ -1109,14 +1505,14 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
                   color: tab === t.id ? "var(--dsw-alias-text-primary, #fff)" : "var(--dsw-alias-text-secondary, #999)",
                   borderBottom: tab === t.id ? "2px solid var(--dsw-alias-accent, #4f8cff)" : "2px solid transparent"
                 },
-                children: t.label
+                children: t.id === "changes" && changeCount > 0 ? `\u53D8\u66F4 ${changeCount}` : t.label
               })
             )
           }),
           (0, import_jsx_runtime7.jsx)("div", {
             "data-wt-tabpanel": true,
             style: { flex: 1, minHeight: 0, overflow: "auto", padding: "4px 0" },
-            children: tab === "sessions" ? (0, import_jsx_runtime7.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime7.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : (0, import_jsx_runtime7.jsx)(Changes, { cwd, sessionId: current, rpc })
+            children: tab === "sessions" ? (0, import_jsx_runtime7.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime7.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : (0, import_jsx_runtime7.jsx)(Changes, { cwd, sessionId: current, rpc, onCountChange: setChangeCount })
           })
         ]
       })

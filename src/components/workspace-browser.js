@@ -1,5 +1,5 @@
 import { jsx } from "react/jsx-runtime";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { SessionList } from "./session-list.js";
 import { FileTree } from "./file-tree.js";
 import { Changes } from "./changes.js";
@@ -18,8 +18,21 @@ const TABS = [
 export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
   const [open, setOpen] = useState(true);
   const [tab, setTab] = useState("files");
+  const [railW, setRailW] = useState(300);
+  const [changeCount, setChangeCount] = useState(0);
   const current = useSessions((s) => s.current);
   const cwd = useSessions((s) => (s.current ? s.byId[s.current]?.cwd : undefined));
+
+  // rail 左缘拖拽改宽度（clamp 200–600）
+  const onResizeDown = useCallback((e) => {
+    const move = (ev) => setRailW(Math.min(600, Math.max(200, window.innerWidth - ev.clientX)));
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  }, []);
 
   return jsx("div", {
     "data-wt-rail": true,
@@ -28,12 +41,26 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
       right: 0,
       top: 0,
       bottom: 0,
+      width: railW,
       display: "flex",
       zIndex: 5,
       fontSize: "13px",
       color: "var(--dsw-alias-text-primary, #ddd)",
     },
     children: [
+      // 宽度拖拽把手（rail 首子元素）
+      jsx("div", {
+        "data-wt-resize": true,
+        onMouseDown: onResizeDown,
+        title: "拖拽调整宽度",
+        style: {
+          width: 4,
+          flexShrink: 0,
+          cursor: "col-resize",
+          background: "var(--dsw-alias-bg-float, #1f1f1f)",
+          borderLeft: "1px solid var(--dsw-alias-border-l2, #333)",
+        },
+      }),
       // 收展按钮（面板左侧窄条）
       jsx("button", {
         type: "button",
@@ -60,7 +87,8 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
         jsx("div", {
           "data-wt-panel": true,
           style: {
-            width: 300,
+            flex: 1,
+            minWidth: 0,
             background: "var(--dsw-alias-bg-base, #1a1a1a)",
             borderLeft: "1px solid var(--dsw-alias-border-l2, #333)",
             display: "flex",
@@ -92,7 +120,7 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
                     color: tab === t.id ? "var(--dsw-alias-text-primary, #fff)" : "var(--dsw-alias-text-secondary, #999)",
                     borderBottom: tab === t.id ? "2px solid var(--dsw-alias-accent, #4f8cff)" : "2px solid transparent",
                   },
-                  children: t.label,
+                  children: t.id === "changes" && changeCount > 0 ? `变更 ${changeCount}` : t.label,
                 }),
               ),
             }),
@@ -104,7 +132,7 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
                   ? jsx(SessionList, { useSessions, openSession })
                   : tab === "files"
                     ? jsx(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer })
-                    : jsx(Changes, { cwd, sessionId: current, rpc }),
+                    : jsx(Changes, { cwd, sessionId: current, rpc, onCountChange: setChangeCount }),
             }),
           ],
         }),
