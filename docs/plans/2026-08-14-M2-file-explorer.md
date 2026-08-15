@@ -1022,14 +1022,16 @@ git commit -m "feat: M2 file browser UI (3-tab sidebar, lazy file tree, context 
 - Modify: `docs/plans/2026-08-14-M2-file-explorer.md`（勾选完成项）
 - 无新代码。
 
-- [ ] **Step 1: harness 实际 serve 新 bundle**
+- [x] **Step 1: harness 实际 serve 新 bundle**
 
 Run: `curl -s http://127.0.0.1:3080/plugins/dsh-workspace-tools/client.js | wc -c && curl -s http://127.0.0.1:3080/plugins/dsh-workspace-tools/client.js | grep -c "data-wt-sidebar"`
 Expected: 字节数较 M1（1330）明显增大；`data-wt-sidebar` ≥1（serveBundle 每请求 readFile + no-cache，无需重启 harness）。
+结果（2026-08-15）：**16341 字节**、`data-wt-sidebar`=1、`sidebar.workspaces`=2、HTTP 200 ✅。
 
 - [ ] **Step 2: GUI 手动验收（浏览器刷新 127.0.0.1:3080）**
 
-逐项核对并在计划中勾选：
+> ⚠️ **前置条件（2026-08-15 实测）**：当前 harness（PID 5846，17:50 启动）仍运行 **M1 host 插件**——client.js 每请求实时读盘已是新版，但 host RPC handler 需**重启 harness 后**才加载 Task 1 的契约修正（实测所有 `/workspace-tools/*` 调用返回旧版 `unknown-op`）。刷新浏览器可见三段页签与文件树骨架，但树数据需重启后加载。**重启会断开当前会话**，故由用户在适当时机执行后逐项勾选：
+
 - [ ] 刷新后控制台无 `invalid plugin` / slot 报错；侧边栏出现 会话/文件/变更 三段切换条（shipped browser 被遮蔽）。
 - [ ] 文件页签：显示当前会话 cwd 的目录树（目录优先、dot 条目隐藏）。
 - [ ] 点击目录折叠/展开；深层目录首次展开有"加载中…"瞬时态（懒加载）。
@@ -1055,13 +1057,14 @@ Expected: 推送成功（可用 `git ls-remote https://github.com/g1998815/dsh-w
 
 ## 里程碑验收清单（M2）
 
-- [ ] `node --test` 全绿（36 用例：rpc 5 / workspace-fs 8 / git-diff 7 / console 4 / client-logic 12）。
-- [ ] host RPC 契约修正落地：handler `(endpoint, payload)` + `ok/fail` 信封 + `failFrom` 封闭枚举映射 + cwd 会话校验（Task 1 测试覆盖）。
-- [ ] dotfile 策略统一为"全部 dot 条目隐藏"，纯函数与 RPC 路径一致（Task 2）。
-- [ ] client 纯逻辑层有单测（RPC 解包 / 树行计算 / draft 插入，Task 3）。
-- [ ] `client.js` 重建并提交；harness curl 返回含 `data-wt-sidebar` 的新 bundle。
-- [ ] GUI 手动验收 9 项全部通过（Task 5 Step 2）。
-- [ ] 推送至 GitHub 私有仓库 main 分支。
+- [x] `node --test` 全绿（**42 用例**：rpc 5 / workspace-fs 8 / git-diff 7 / console 4 / client-logic 11 / rpc-integration 7）。
+- [x] host RPC 契约修正落地：handler `(endpoint, payload)` + `ok/fail` 信封 + `failFrom` 封闭枚举映射 + fail-closed cwd 会话校验（Task 1 + rpc-integration 测试覆盖）。
+- [x] dotfile 策略统一为"全部 dot 条目隐藏"，纯函数与 RPC 路径一致（Task 2）。
+- [x] client 纯逻辑层有单测（RPC 解包 / 树行计算 / draft 插入，Task 3）。
+- [x] `client.js` 重建并提交；harness curl 返回含 `data-wt-sidebar` 的新 bundle（16341B）。
+- [x] relPath 包含校验（`assertInside` 拦截越界）+ `session-conflict` 信封 schema 安全 + 子目录错误可见可重试 + guard 分发集成测试（终审修复 01df90f）。
+- [ ] GUI 手动验收 9 项全部通过（Task 5 Step 2 —— **需重启 harness 后由用户勾选**）。
+- [x] 推送至 GitHub 私有仓库 main 分支。
 
 ## 后续（非 M2 范围）
 
