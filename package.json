@@ -3,9 +3,13 @@
   "version": "0.1.0",
   "description": "DSH 第三方插件：Git Diff 变更列表 / 文件浏览器 / PTY 控制台",
   "type": "module",
-  "main": "lib/index.js",
+  "main": "lib/index.cjs",
   "exports": {
-    ".": { "default": "./lib/index.js" },
+    ".": {
+      "import": "./lib/index.js",
+      "require": "./lib/index.cjs",
+      "default": "./lib/index.js"
+    },
     "./client": { "default": "./client.js" },
     "./package.json": "./package.json"
   },

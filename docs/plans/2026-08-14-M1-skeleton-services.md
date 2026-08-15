@@ -58,9 +58,13 @@
   "version": "0.1.0",
   "description": "DSH 第三方插件：Git Diff 变更列表 / 文件浏览器 / PTY 控制台",
   "type": "module",
-  "main": "lib/index.js",
+  "main": "lib/index.cjs",
   "exports": {
-    ".": { "default": "./lib/index.js" },
+    ".": {
+      "import": "./lib/index.js",
+      "require": "./lib/index.cjs",
+      "default": "./lib/index.js"
+    },
     "./client": { "default": "./client.js" },
     "./package.json": "./package.json"
   },
@@ -762,6 +766,7 @@ git commit -m "feat: console host service (detectShell + spawnTerminal DI wrappe
 
 **Files:**
 - Create: `lib/index.js`
+- Create: `lib/index.cjs`（CJS 桥：`module.exports = require("./index.js")`，为按 `require()`/`main` 解析的加载器提供 `module.exports` 兜底；配合 package.json 条件导出 `import → ./lib/index.js`、`require/main → ./lib/index.cjs`，适配所有加载路径）
 
 **Interfaces:**
 - Consumes: `lib/services/git-diff.js`（`listChanges`/`getDiff`）、`lib/services/workspace-fs.js`（`resolvePath` fallback）、`lib/services/console.js`（`createShellSession`/`detectShell`）；host 服务 `ctx.connection.rpc.handle`（一元 RPC，loopback authority）、`ctx.webServer.registerUpgrade`（自建 WebSocket）、`ctx.fs`（优先复用，读零拦截）、`ctx.subprocess.spawnTerminal`。
