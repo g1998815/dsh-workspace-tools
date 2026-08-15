@@ -458,7 +458,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
           jsx("input", {
             type: "text",
             "data-wt-commit-msg": true,
-            placeholder: "提交消息…",
+            placeholder: "提交消息（必填）…",
             value: commitMsg,
             onChange: (e) => setCommitMsg(e.target.value),
             style: {
@@ -485,6 +485,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
             type: "button",
             "data-wt-commit-selected": true,
             disabled: n === 0 || msgEmpty,
+            title: n === 0 ? "请先勾选要提交的文件" : msgEmpty ? "请先填写提交消息" : "提交勾选的文件",
             onClick: commitSelected,
             style: { ...BTN, opacity: n === 0 || msgEmpty ? 0.45 : 1, cursor: n === 0 || msgEmpty ? "default" : "pointer" },
             children: `提交选中(${n})`,
@@ -493,6 +494,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
             type: "button",
             "data-wt-commit-all": true,
             disabled: msgEmpty,
+            title: msgEmpty ? "请先填写提交消息" : "提交全部变更",
             onClick: commitAll,
             style: { ...BTN, opacity: msgEmpty ? 0.45 : 1, cursor: msgEmpty ? "default" : "pointer" },
             children: "全部提交",

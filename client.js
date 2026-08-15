@@ -1463,7 +1463,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
           (0, import_jsx_runtime8.jsx)("input", {
             type: "text",
             "data-wt-commit-msg": true,
-            placeholder: "\u63D0\u4EA4\u6D88\u606F\u2026",
+            placeholder: "\u63D0\u4EA4\u6D88\u606F\uFF08\u5FC5\u586B\uFF09\u2026",
             value: commitMsg,
             onChange: (e) => setCommitMsg(e.target.value),
             style: {
@@ -1490,6 +1490,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
             type: "button",
             "data-wt-commit-selected": true,
             disabled: n === 0 || msgEmpty,
+            title: n === 0 ? "\u8BF7\u5148\u52FE\u9009\u8981\u63D0\u4EA4\u7684\u6587\u4EF6" : msgEmpty ? "\u8BF7\u5148\u586B\u5199\u63D0\u4EA4\u6D88\u606F" : "\u63D0\u4EA4\u52FE\u9009\u7684\u6587\u4EF6",
             onClick: commitSelected,
             style: { ...BTN2, opacity: n === 0 || msgEmpty ? 0.45 : 1, cursor: n === 0 || msgEmpty ? "default" : "pointer" },
             children: `\u63D0\u4EA4\u9009\u4E2D(${n})`
@@ -1498,6 +1499,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
             type: "button",
             "data-wt-commit-all": true,
             disabled: msgEmpty,
+            title: msgEmpty ? "\u8BF7\u5148\u586B\u5199\u63D0\u4EA4\u6D88\u606F" : "\u63D0\u4EA4\u5168\u90E8\u53D8\u66F4",
             onClick: commitAll,
             style: { ...BTN2, opacity: msgEmpty ? 0.45 : 1, cursor: msgEmpty ? "default" : "pointer" },
             children: "\u5168\u90E8\u63D0\u4EA4"
