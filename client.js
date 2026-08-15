@@ -1106,6 +1106,24 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
   const [splitPct, setSplitPct] = (0, import_react6.useState)(50);
   const [previewLines, setPreviewLines] = (0, import_react6.useState)(null);
   const [opError, setOpError] = (0, import_react6.useState)(null);
+  const [ctxMenu, setCtxMenu] = (0, import_react6.useState)(null);
+  const changesRef = (0, import_react6.useRef)(null);
+  (0, import_react6.useEffect)(() => {
+    if (!ctxMenu) return void 0;
+    const onDown = (ev) => {
+      if (ctxMenuRef.current && !ctxMenuRef.current.contains(ev.target)) setCtxMenu(null);
+    };
+    const onKey = (ev) => {
+      if (ev.key === "Escape") setCtxMenu(null);
+    };
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [ctxMenu]);
+  const ctxMenuRef = (0, import_react6.useRef)(null);
   const load = (0, import_react6.useCallback)(() => {
     if (!cwd) {
       setGroups([]);
@@ -1367,14 +1385,15 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
           key: c.hash,
           "data-wt-history-row": true,
           "data-selected": selCommit?.hash === c.hash || void 0,
-          title: "\u5DE6\u952E\u9009\u4E2D\uFF08\u56DE\u9000\uFF09\xB7 \u53F3\u952E\u67E5\u770B\u63D0\u4EA4\u8BE6\u60C5",
+          title: "\u5DE6\u952E\u9009\u4E2D\uFF08\u56DE\u9000\uFF09\xB7 \u53F3\u952E\u83DC\u5355",
           onClick: () => {
             setSelCommit(c);
             setConfirmReset(false);
           },
           onContextMenu: (e) => {
             e.preventDefault();
-            setDetail({ hash: c.hash, shortHash: c.shortHash });
+            const rect = changesRef.current?.getBoundingClientRect();
+            setCtxMenu({ x: e.clientX - (rect?.left ?? 0), y: e.clientY - (rect?.top ?? 0), commit: c });
           },
           style: {
             padding: "4px 10px",
@@ -1590,16 +1609,50 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
     });
   }
   return (0, import_jsx_runtime8.jsx)("div", {
+    ref: changesRef,
     "data-wt-changes": true,
-    style: { display: "flex", flexDirection: "column", height: "100%", minHeight: 0 },
-    children: [infoRow, upperPane, splitBar, lowerPane, diffWindow, detail && (0, import_jsx_runtime8.jsx)(CommitDetailWindow, {
-      key: detail.hash,
-      target: detail.hash,
-      cwd,
-      sessionId,
-      rpc,
-      onClose: () => setDetail(null)
-    })]
+    style: { display: "flex", flexDirection: "column", height: "100%", minHeight: 0, position: "relative" },
+    children: [
+      infoRow,
+      upperPane,
+      splitBar,
+      lowerPane,
+      diffWindow,
+      detail && (0, import_jsx_runtime8.jsx)(CommitDetailWindow, {
+        key: detail.hash,
+        target: detail.hash,
+        cwd,
+        sessionId,
+        rpc,
+        onClose: () => setDetail(null)
+      }),
+      ctxMenu && (0, import_jsx_runtime8.jsx)("div", {
+        ref: ctxMenuRef,
+        "data-wt-changes-ctx": true,
+        style: {
+          position: "absolute",
+          left: ctxMenu.x,
+          top: ctxMenu.y,
+          zIndex: 40,
+          minWidth: 120,
+          background: "var(--dsw-alias-bg-float, #1f1f1f)",
+          border: "1px solid var(--dsw-alias-border-l2, #333)",
+          borderRadius: 6,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+          padding: 4
+        },
+        children: (0, import_jsx_runtime8.jsx)("div", {
+          role: "menuitem",
+          "data-wt-ctx-open": true,
+          onClick: () => {
+            setDetail({ hash: ctxMenu.commit.hash, shortHash: ctxMenu.commit.shortHash });
+            setCtxMenu(null);
+          },
+          style: { padding: "6px 10px", cursor: "pointer", borderRadius: 4 },
+          children: "\u6253\u5F00"
+        })
+      })
+    ]
   });
 }
 

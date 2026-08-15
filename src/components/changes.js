@@ -4,7 +4,7 @@
 // M3d Task 2：历史行点击打开提交详情浮窗（CommitDetailWindow：文件列表 + 单文件 diff）。
 // 保留 M3 能力：变更列表分组/折叠/单文件 diff 浮窗（与预览选中浮窗共用 DiffWindow）。
 import { jsx } from "react/jsx-runtime";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { callRpc } from "../lib/rpc.js";
 import { normalizeChanges, groupByDir, visibleRows, parseDiff } from "../lib/git-changes.js";
 import { relativeTime } from "../lib/git-history-client.js";
@@ -56,6 +56,26 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
   const [splitPct, setSplitPct] = useState(50); // 上半区高度百分比
   const [previewLines, setPreviewLines] = useState(null); // 预览选中的拼接 diff
   const [opError, setOpError] = useState(null); // 提交/回退等操作失败的小型内联提示（不影响列表 status）
+  const [ctxMenu, setCtxMenu] = useState(null); // {x, y, commit} —— 历史行右键菜单
+  const changesRef = useRef(null);
+
+  // 右键菜单：外部点击 / Esc 关闭
+  useEffect(() => {
+    if (!ctxMenu) return undefined;
+    const onDown = (ev) => {
+      if (ctxMenuRef.current && !ctxMenuRef.current.contains(ev.target)) setCtxMenu(null);
+    };
+    const onKey = (ev) => {
+      if (ev.key === "Escape") setCtxMenu(null);
+    };
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [ctxMenu]);
+  const ctxMenuRef = useRef(null);
 
   // 并行加载：变更 + 分支 + 历史（recentMessages 复用 commits 前 5 条 subject）
   const load = useCallback(() => {
@@ -353,14 +373,15 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
           key: c.hash,
           "data-wt-history-row": true,
           "data-selected": selCommit?.hash === c.hash || undefined,
-          title: "左键选中（回退）· 右键查看提交详情",
+          title: "左键选中（回退）· 右键菜单",
           onClick: () => {
             setSelCommit(c);
             setConfirmReset(false);
           },
           onContextMenu: (e) => {
             e.preventDefault();
-            setDetail({ hash: c.hash, shortHash: c.shortHash });
+            const rect = changesRef.current?.getBoundingClientRect();
+            setCtxMenu({ x: e.clientX - (rect?.left ?? 0), y: e.clientY - (rect?.top ?? 0), commit: c });
           },
           style: {
             padding: "4px 10px",
@@ -597,8 +618,9 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
   }
 
   return jsx("div", {
+    ref: changesRef,
     "data-wt-changes": true,
-    style: { display: "flex", flexDirection: "column", height: "100%", minHeight: 0 },
+    style: { display: "flex", flexDirection: "column", height: "100%", minHeight: 0, position: "relative" },
     children: [infoRow, upperPane, splitBar, lowerPane, diffWindow, detail &&
       jsx(CommitDetailWindow, {
         key: detail.hash,
@@ -607,6 +629,33 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
         sessionId,
         rpc,
         onClose: () => setDetail(null),
-      })],
+      }),
+      ctxMenu &&
+        jsx("div", {
+          ref: ctxMenuRef,
+          "data-wt-changes-ctx": true,
+          style: {
+            position: "absolute",
+            left: ctxMenu.x,
+            top: ctxMenu.y,
+            zIndex: 40,
+            minWidth: 120,
+            background: "var(--dsw-alias-bg-float, #1f1f1f)",
+            border: "1px solid var(--dsw-alias-border-l2, #333)",
+            borderRadius: 6,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+            padding: 4,
+          },
+          children: jsx("div", {
+            role: "menuitem",
+            "data-wt-ctx-open": true,
+            onClick: () => {
+              setDetail({ hash: ctxMenu.commit.hash, shortHash: ctxMenu.commit.shortHash });
+              setCtxMenu(null);
+            },
+            style: { padding: "6px 10px", cursor: "pointer", borderRadius: 4 },
+            children: "打开",
+          }),
+        })],
   });
 }
