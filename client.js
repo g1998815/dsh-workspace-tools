@@ -138,6 +138,13 @@ function fileGlyph(name2, isDir) {
   return GLYPHS[ext] ?? "\u{1F4C4}";
 }
 
+// src/lib/tree-filter.js
+function filterRows(rows, q) {
+  const query = (q ?? "").trim().toLowerCase();
+  if (!query) return rows;
+  return rows.filter((r) => (r.name ?? "").toLowerCase().includes(query) || (r.path ?? "").toLowerCase().includes(query));
+}
+
 // src/components/preview-window.js
 var import_jsx_runtime3 = require("react/jsx-runtime");
 var import_react2 = require("react");
@@ -192,6 +199,34 @@ function previewKind(name2) {
   if (TEXT_EXTENSIONS.has(ext)) return "text";
   if (IMAGE_EXTENSIONS.has(ext)) return "image";
   return null;
+}
+
+// src/lib/tokenize.js
+var KEYWORDS = {
+  js: /* @__PURE__ */ new Set(["const", "let", "var", "function", "return", "if", "else", "for", "while", "class", "import", "export", "from", "new", "this", "async", "await", "try", "catch", "throw", "switch", "case", "break", "continue", "typeof", "instanceof", "extends", "super", "static", "get", "set", "null", "undefined", "true", "false"]),
+  java: /* @__PURE__ */ new Set(["public", "private", "protected", "class", "interface", "extends", "implements", "return", "if", "else", "for", "while", "new", "this", "static", "final", "void", "int", "long", "double", "boolean", "String", "try", "catch", "throw", "import", "package", "null", "true", "false"]),
+  py: /* @__PURE__ */ new Set(["def", "class", "return", "if", "elif", "else", "for", "while", "import", "from", "as", "with", "try", "except", "finally", "lambda", "pass", "break", "continue", "None", "True", "False", "self", "global", "nonlocal", "yield", "raise", "in", "is", "not", "and", "or"])
+};
+function tokenize(text, ext) {
+  const lang = ext === "py" ? "py" : ext === "java" ? "java" : ext === "js" || ext === "ts" || ext === "jsx" || ext === "tsx" ? "js" : null;
+  const kws = lang ? KEYWORDS[lang] : null;
+  const out = [];
+  const re = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|\/\/[^\n]*|#[^\n]*|<!--[\s\S]*?-->|\b\d+(?:\.\d+)?\b|[A-Za-z_$][A-Za-z0-9_$]*)/g;
+  let last = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) out.push({ text: text.slice(last, m.index), cls: null });
+    const tok = m[0];
+    let cls = null;
+    if (tok.startsWith('"') || tok.startsWith("'") || tok.startsWith("`")) cls = "str";
+    else if (tok.startsWith("//") || tok.startsWith("#") || tok.startsWith("<!--")) cls = "com";
+    else if (/^\d/.test(tok)) cls = "num";
+    else if (kws && kws.has(tok)) cls = "kw";
+    out.push({ text: tok, cls });
+    last = m.index + tok.length;
+  }
+  if (last < text.length) out.push({ text: text.slice(last), cls: null });
+  return out;
 }
 
 // src/components/draggable-window.js
@@ -339,9 +374,11 @@ function DraggableWindow({ title, badge, width = 640, onClose, search, wtPrefix 
 
 // src/components/preview-window.js
 var WINDOW_W = 640;
+var TOKEN_COLORS = { str: "#7ec699", com: "#6a737d", kw: "#61afef", num: "#e6b450" };
 var MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", bmp: "image/bmp", ico: "image/x-icon", avif: "image/avif" };
 function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
   const kind = previewKind(file);
+  const ext = file.includes(".") ? file.split(".").pop().toLowerCase() : "";
   const [state, setState] = (0, import_react2.useState)("loading");
   const [error, setError] = (0, import_react2.useState)(null);
   const [textLines, setTextLines] = (0, import_react2.useState)(null);
@@ -369,8 +406,8 @@ function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
     } else if (kind === "image") {
       callRpc(rpc, "fs.readImage", { cwd, sessionId, file }).then((value) => {
         if (cancelled) return;
-        const ext = file.includes(".") ? file.split(".").pop().toLowerCase() : "";
-        setImgUrl(`data:${MIME[ext] ?? "image/png"};base64,${value.base64}`);
+        const ext2 = file.includes(".") ? file.split(".").pop().toLowerCase() : "";
+        setImgUrl(`data:${MIME[ext2] ?? "image/png"};base64,${value.base64}`);
         setState("ready");
       }).catch((err) => {
         if (cancelled) return;
@@ -424,8 +461,19 @@ function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
           "data-line": i,
           "data-wt-preview-line": true,
           "data-wt-match": isMatch || void 0,
-          style: { background: isMatch ? "rgba(230,180,80,0.28)" : "none", color: isMatch ? "#f0d59a" : void 0 },
-          children: t || " "
+          style: { display: "flex", background: isMatch ? "rgba(230,180,80,0.28)" : "none", color: isMatch ? "#f0d59a" : void 0 },
+          children: [
+            (0, import_jsx_runtime3.jsx)("span", {
+              "data-wt-preview-lineno": true,
+              style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 8, userSelect: "none" },
+              children: String(i + 1)
+            }),
+            (0, import_jsx_runtime3.jsx)("span", {
+              children: tokenize(t || " ", ext).map(
+                (tok, j) => tok.cls ? (0, import_jsx_runtime3.jsx)("span", { key: j, style: { color: TOKEN_COLORS[tok.cls] }, children: tok.text }) : tok.text
+              )
+            })
+          ]
         });
       })
     });
@@ -461,6 +509,7 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
   const [selected, setSelected] = (0, import_react3.useState)(null);
   const [preview, setPreview] = (0, import_react3.useState)(null);
   const [menu, setMenu] = (0, import_react3.useState)(null);
+  const [filterQ, setFilterQ] = (0, import_react3.useState)("");
   const panelRef = (0, import_react3.useRef)(null);
   const menuRef = (0, import_react3.useRef)(null);
   const nodesRef = (0, import_react3.useRef)(nodes);
@@ -527,7 +576,7 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
     },
     [expanded, loadDir]
   );
-  const rows = (0, import_react3.useMemo)(() => visibleRows(nodes, expanded), [nodes, expanded]);
+  const rows = (0, import_react3.useMemo)(() => filterRows(visibleRows(nodes, expanded), filterQ), [nodes, expanded, filterQ]);
   const root = nodes.get("");
   (0, import_react3.useEffect)(() => {
     if (!menu) return void 0;
@@ -637,6 +686,23 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
     "data-wt-filetree": true,
     style: { position: "relative", minHeight: 0 },
     children: [
+      (0, import_jsx_runtime4.jsx)("input", {
+        "data-wt-filter": true,
+        value: filterQ,
+        onChange: (ev) => setFilterQ(ev.target.value),
+        placeholder: "\u8FC7\u6EE4\u2026",
+        style: {
+          width: "100%",
+          boxSizing: "border-box",
+          padding: "6px 10px",
+          background: "transparent",
+          border: "none",
+          borderBottom: "1px solid var(--dsw-alias-border-l2, #333)",
+          color: "var(--dsw-alias-text-primary, #ddd)",
+          outline: "none",
+          fontSize: 12
+        }
+      }),
       body,
       menu && (0, import_jsx_runtime4.jsx)("div", {
         ref: menuRef,

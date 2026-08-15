@@ -7,14 +7,18 @@ import { jsx } from "react/jsx-runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { callRpc } from "../lib/rpc.js";
 import { previewKind } from "../lib/preview.js";
+import { tokenize } from "../lib/tokenize.js";
 import { DraggableWindow } from "./draggable-window.js";
 
 const WINDOW_W = 640;
+
+const TOKEN_COLORS = { str: "#7ec699", com: "#6a737d", kw: "#61afef", num: "#e6b450" };
 
 const MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", bmp: "image/bmp", ico: "image/x-icon", avif: "image/avif" };
 
 export function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
   const kind = previewKind(file);
+  const ext = file.includes(".") ? file.split(".").pop().toLowerCase() : "";
   const [state, setState] = useState("loading"); // loading | ready | error
   const [error, setError] = useState(null);
   const [textLines, setTextLines] = useState(null);
@@ -98,8 +102,21 @@ export function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
           "data-line": i,
           "data-wt-preview-line": true,
           "data-wt-match": isMatch || undefined,
-          style: { background: isMatch ? "rgba(230,180,80,0.28)" : "none", color: isMatch ? "#f0d59a" : undefined },
-          children: t || " ",
+          style: { display: "flex", background: isMatch ? "rgba(230,180,80,0.28)" : "none", color: isMatch ? "#f0d59a" : undefined },
+          children: [
+            jsx("span", {
+              "data-wt-preview-lineno": true,
+              style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 8, userSelect: "none" },
+              children: String(i + 1),
+            }),
+            jsx("span", {
+              children: tokenize(t || " ", ext).map((tok, j) =>
+                tok.cls
+                  ? jsx("span", { key: j, style: { color: TOKEN_COLORS[tok.cls] }, children: tok.text })
+                  : tok.text,
+              ),
+            }),
+          ],
         });
       }),
     });

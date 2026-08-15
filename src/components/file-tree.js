@@ -2,6 +2,7 @@ import { jsx } from "react/jsx-runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { callRpc } from "../lib/rpc.js";
 import { parseEntries, visibleRows, fileGlyph, toggleExpanded } from "../lib/fs-tree.js";
+import { filterRows } from "../lib/tree-filter.js";
 import { PreviewWindow } from "./preview-window.js";
 import { previewKind } from "../lib/preview.js";
 
@@ -13,6 +14,7 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
   const [selected, setSelected] = useState(null); // rel
   const [preview, setPreview] = useState(null); // {rel, name}
   const [menu, setMenu] = useState(null); // {x, y, rel, name, absolute, isDir}
+  const [filterQ, setFilterQ] = useState("");
   const panelRef = useRef(null);
   const menuRef = useRef(null);
   const nodesRef = useRef(nodes);
@@ -88,7 +90,7 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
     [expanded, loadDir],
   );
 
-  const rows = useMemo(() => visibleRows(nodes, expanded), [nodes, expanded]);
+  const rows = useMemo(() => filterRows(visibleRows(nodes, expanded), filterQ), [nodes, expanded, filterQ]);
   const root = nodes.get("");
 
   // 右键菜单：面板内定位 + 外部点击/Escape 关闭
@@ -209,6 +211,23 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
     "data-wt-filetree": true,
     style: { position: "relative", minHeight: 0 },
     children: [
+      jsx("input", {
+        "data-wt-filter": true,
+        value: filterQ,
+        onChange: (ev) => setFilterQ(ev.target.value),
+        placeholder: "过滤…",
+        style: {
+          width: "100%",
+          boxSizing: "border-box",
+          padding: "6px 10px",
+          background: "transparent",
+          border: "none",
+          borderBottom: "1px solid var(--dsw-alias-border-l2, #333)",
+          color: "var(--dsw-alias-text-primary, #ddd)",
+          outline: "none",
+          fontSize: 12,
+        },
+      }),
       body,
       menu &&
         jsx("div", {
