@@ -401,7 +401,8 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
     });
   }
 
-  // 回退操作条（选中提交时出现）
+  // 回退操作条（选中提交时出现）；选中 HEAD 本身时回退无意义（reset 到自身）→ 禁用并提示
+  const isHeadCommit = !!selCommit && commits.length > 0 && selCommit.hash === commits[0].hash;
   const resetBar = selCommit
     ? jsx("div", {
         "data-wt-reset-bar": true,
@@ -418,15 +419,17 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
           jsx("button", {
             type: "button",
             "data-wt-reset": true,
+            disabled: isHeadCommit,
             onClick: doReset,
             style: {
               padding: "5px 10px",
               borderRadius: 4,
               border: "none",
-              cursor: "pointer",
+              cursor: isHeadCommit ? "not-allowed" : "pointer",
               fontWeight: 600,
               fontSize: 12,
               color: "#fff",
+              opacity: isHeadCommit ? 0.5 : 1,
               background: confirmReset ? "#c0392b" : "#555", // 默认灰，确认时变红
             },
             children: confirmReset ? "确认回退？" : `回退到 ${selCommit.shortHash}`,
@@ -434,7 +437,9 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
           jsx("div", {
             "data-wt-reset-warn": true,
             style: { color: "#e6b450", fontSize: 11, lineHeight: 1.4 },
-            children: "若该提交已推送，回退后重新推送需 force",
+            children: isHeadCommit
+              ? "这是最新提交——回退到它自身无效。想撤销它，请选中它下面那一条（回退到其父提交），改动会回到未提交区。"
+              : "若该提交已推送，回退后重新推送需 force",
           }),
         ],
       })

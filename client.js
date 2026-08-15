@@ -1412,6 +1412,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       )
     });
   }
+  const isHeadCommit = !!selCommit && commits.length > 0 && selCommit.hash === commits[0].hash;
   const resetBar = selCommit ? (0, import_jsx_runtime8.jsx)("div", {
     "data-wt-reset-bar": true,
     style: {
@@ -1427,15 +1428,17 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       (0, import_jsx_runtime8.jsx)("button", {
         type: "button",
         "data-wt-reset": true,
+        disabled: isHeadCommit,
         onClick: doReset,
         style: {
           padding: "5px 10px",
           borderRadius: 4,
           border: "none",
-          cursor: "pointer",
+          cursor: isHeadCommit ? "not-allowed" : "pointer",
           fontWeight: 600,
           fontSize: 12,
           color: "#fff",
+          opacity: isHeadCommit ? 0.5 : 1,
           background: confirmReset ? "#c0392b" : "#555"
           // 默认灰，确认时变红
         },
@@ -1444,7 +1447,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       (0, import_jsx_runtime8.jsx)("div", {
         "data-wt-reset-warn": true,
         style: { color: "#e6b450", fontSize: 11, lineHeight: 1.4 },
-        children: "\u82E5\u8BE5\u63D0\u4EA4\u5DF2\u63A8\u9001\uFF0C\u56DE\u9000\u540E\u91CD\u65B0\u63A8\u9001\u9700 force"
+        children: isHeadCommit ? "\u8FD9\u662F\u6700\u65B0\u63D0\u4EA4\u2014\u2014\u56DE\u9000\u5230\u5B83\u81EA\u8EAB\u65E0\u6548\u3002\u60F3\u64A4\u9500\u5B83\uFF0C\u8BF7\u9009\u4E2D\u5B83\u4E0B\u9762\u90A3\u4E00\u6761\uFF08\u56DE\u9000\u5230\u5176\u7236\u63D0\u4EA4\uFF09\uFF0C\u6539\u52A8\u4F1A\u56DE\u5230\u672A\u63D0\u4EA4\u533A\u3002" : "\u82E5\u8BE5\u63D0\u4EA4\u5DF2\u63A8\u9001\uFF0C\u56DE\u9000\u540E\u91CD\u65B0\u63A8\u9001\u9700 force"
       })
     ]
   }) : null;
