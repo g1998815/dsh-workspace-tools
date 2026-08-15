@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { SessionList } from "./session-list.js";
 import { FileTree } from "./file-tree.js";
 import { Changes } from "./changes.js";
+import { ConsolePanel } from "./console.js";
 
 // 页签顺序（2026-08-15 用户定）：文件 → 变更 → 会话（会话放最后）
 const TABS = [
@@ -20,6 +21,7 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
   const [tab, setTab] = useState("files");
   const [railW, setRailW] = useState(300);
   const [changeCount, setChangeCount] = useState(0);
+  const [consoleOpen, setConsoleOpen] = useState(false);
   const current = useSessions((s) => s.current);
   const cwd = useSessions((s) => (s.current ? s.byId[s.current]?.cwd : undefined));
 
@@ -104,25 +106,46 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
                 borderBottom: "1px solid var(--dsw-alias-border-l2, #333)",
                 flexShrink: 0,
               },
-              children: TABS.map((t) =>
+              children: [
+                TABS.map((t) =>
+                  jsx("button", {
+                    key: t.id,
+                    type: "button",
+                    onClick: () => setTab(t.id),
+                    "data-active": tab === t.id || undefined,
+                    style: {
+                      flex: 1,
+                      padding: "8px 4px",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      color: tab === t.id ? "var(--dsw-alias-text-primary, #fff)" : "var(--dsw-alias-text-secondary, #999)",
+                      borderBottom: tab === t.id ? "2px solid var(--dsw-alias-accent, #4f8cff)" : "2px solid transparent",
+                    },
+                    children: t.id === "changes" && changeCount > 0 ? `变更 ${changeCount}` : t.label,
+                  }),
+                ),
+                // 控制台开关（M4）：固定在页签条右端；面板本身 fixed 于底部
                 jsx("button", {
-                  key: t.id,
                   type: "button",
-                  onClick: () => setTab(t.id),
-                  "data-active": tab === t.id || undefined,
+                  "data-wt-console-toggle": true,
+                  "data-active": consoleOpen || undefined,
+                  title: consoleOpen ? "收起控制台" : "展开控制台",
+                  onClick: () => setConsoleOpen((v) => !v),
                   style: {
-                    flex: 1,
-                    padding: "8px 4px",
+                    padding: "8px 10px",
                     background: "none",
                     border: "none",
+                    borderLeft: "1px solid var(--dsw-alias-border-l2, #333)",
                     cursor: "pointer",
                     fontSize: "12px",
-                    color: tab === t.id ? "var(--dsw-alias-text-primary, #fff)" : "var(--dsw-alias-text-secondary, #999)",
-                    borderBottom: tab === t.id ? "2px solid var(--dsw-alias-accent, #4f8cff)" : "2px solid transparent",
+                    color: consoleOpen ? "var(--dsw-alias-text-primary, #fff)" : "var(--dsw-alias-text-secondary, #999)",
+                    borderBottom: consoleOpen ? "2px solid var(--dsw-alias-accent, #4f8cff)" : "2px solid transparent",
                   },
-                  children: t.id === "changes" && changeCount > 0 ? `变更 ${changeCount}` : t.label,
+                  children: "终端",
                 }),
-              ),
+              ],
             }),
             jsx("div", {
               "data-wt-tabpanel": true,
@@ -136,6 +159,9 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
             }),
           ],
         }),
+      // 控制台面板（M4）：**常驻渲染**（不条件卸载），open 只控制 display——收起不丢会话。
+      // 面板 fixed 于视口底部，渲染在 rail 内无妨（fixed 脱离定位）。
+      jsx(ConsolePanel, { cwd, sessionId: current, rpc, open: consoleOpen, onToggle: () => setConsoleOpen(false) }),
     ],
   });
 }
