@@ -765,7 +765,7 @@ git commit -m "feat: console host service (detectShell + spawnTerminal DI wrappe
 
 **Interfaces:**
 - Consumes: `lib/services/git-diff.js`（`listChanges`/`getDiff`）、`lib/services/workspace-fs.js`（`resolvePath` fallback）、`lib/services/console.js`（`createShellSession`/`detectShell`）；host 服务 `ctx.connection.rpc.handle`（一元 RPC，loopback authority）、`ctx.webServer.registerUpgrade`（自建 WebSocket）、`ctx.fs`（优先复用，读零拦截）、`ctx.subprocess.spawnTerminal`。
-- Produces: Cordis 插件默认导出（`export default { name, inject, apply(ctx) {...} }`）：
+- Produces: Cordis 插件导出（**命名导出 `export { name, inject, apply }` + `export default` 双保险**，官方形态对照 dsh-terminal-bash）：
   - RPC 端点 `connection.rpc.handle(channel, handler, { authority: 'loopback' })` 暴露 6 个 op：`git.listChanges` / `git.getDiff` / `fs.listDir` / `fs.resolvePath` / `console.create` / `console.write` / `console.kill`；
   - WebSocket 泵 `/plugins/dsh-workspace-tools/console`（`webServer.registerUpgrade`）：把会话 `handle.output` 文本 chunk 泵给浏览器（M4 起 client 消费），loopback 校验 + 标准握手；
   - 会话 Map 随 ctx dispose 清理（`ctx.effect` disposer）。
@@ -804,12 +804,13 @@ function isLoopback(req) {
   return addr === "127.0.0.1" || addr === "::1" || addr === "::ffff:127.0.0.1";
 }
 
-export default {
-  name: "dsh-workspace-tools",
-  // 服务名已按 §12 报告定稿（connection/webServer/fs/subprocess）。
-  // 注：工作区服务名是 ctx.workspaceRegistry（本插件不 inject，cwd 由 client 显式传入 RPC payload）。
-  inject: ["connection", "webServer", "fs", "subprocess"],
-  apply(ctx) {
+// 官方插件形态：命名导出 { name, inject, apply }（对照 @deepseek-ai/dsh-terminal-bash）。
+// 部分加载器/Node 版本不 unwrap default（拿到的 namespace 或 {default} 包装无 apply），
+// 命名导出让 apply 始终在模块顶层可见；default 同时保留以兼容按 default 解析的加载器。
+export const name = "dsh-workspace-tools";
+export const inject = ["connection", "webServer", "fs", "subprocess"];
+
+export function apply(ctx) {
     const sessions = new Map();
 
     // ── 1) 一元 RPC：client -> host 调用三服务 ──────────────────────────
@@ -945,8 +946,10 @@ export default {
       for (const s of sessions.values()) s.kill();
       sessions.clear();
     });
-  },
-};
+}
+
+// 双保险：默认导出兼容按 default 解析的加载器
+export default { name, inject, apply };
 ```
 
 - [ ] **Step 2: 语法验证 + 纯函数 smoke**
