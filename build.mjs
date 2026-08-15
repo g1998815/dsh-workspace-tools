@@ -37,6 +37,7 @@ const result = await build({
   sourcemap: true,
   write: false, // 手动写盘：外层包官方工厂形状
   external: ["react", "react/jsx-runtime", "@deepseek-ai/*"], // 运行时经 makeRequire 解析
+  loader: { ".css": "text" }, // css 以文本字符串打包（如 @xterm/xterm/css/xterm.css）
   logLevel: "info",
 });
 
