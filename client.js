@@ -101,12 +101,18 @@ var __dshwt = (() => {
   function joinRel(base, name2) {
     return base === "" ? name2 : `${base}/${name2}`;
   }
+  function toggleExpanded(expanded, rel) {
+    const next = new Set(expanded);
+    if (next.has(rel)) next.delete(rel);
+    else next.add(rel);
+    return next;
+  }
   function visibleRows(nodes, expanded) {
     const rows = [];
     const walk = (rel, depth) => {
       const node = nodes.get(rel);
       if (!node || node.status !== "ready") return;
-      for (const e of node.entries) {
+      for (const e of node.entries ?? []) {
         const key = joinRel(rel, e.name);
         rows.push({ rel: key, name: e.name, isDir: e.isDir, absolute: e.absolute, depth });
         if (e.isDir && expanded.has(key)) walk(key, depth + 1);
@@ -141,6 +147,10 @@ var __dshwt = (() => {
     const [menu, setMenu] = (0, import_react.useState)(null);
     const panelRef = (0, import_react.useRef)(null);
     const menuRef = (0, import_react.useRef)(null);
+    const nodesRef = (0, import_react.useRef)(nodes);
+    (0, import_react.useEffect)(() => {
+      nodesRef.current = nodes;
+    }, [nodes]);
     (0, import_react.useEffect)(() => {
       let cancelled = false;
       setNodes(/* @__PURE__ */ new Map());
@@ -169,44 +179,35 @@ var __dshwt = (() => {
     }, [cwd, rpc, sessionId]);
     const loadDir = (0, import_react.useCallback)(
       (rel) => {
+        const current = nodesRef.current.get(rel);
+        if (current && current.status !== "error") return;
         setNodes((prev) => {
-          if (prev.has(rel)) return prev;
+          if (prev.has(rel) && prev.get(rel).status !== "error") return prev;
           const next = new Map(prev);
           next.set(rel, { status: "loading", entries: [] });
-          callRpc(rpc, "fs.listDir", { cwd, relPath: rel, sessionId }).then((value) => {
-            setNodes((prev2) => {
-              const next2 = new Map(prev2);
-              next2.set(rel, { status: "ready", entries: parseEntries(value.entries) });
-              return next2;
-            });
-          }).catch((err) => {
-            setNodes((prev2) => {
-              const next2 = new Map(prev2);
-              next2.set(rel, { status: "error", error: String(err?.message ?? err) });
-              return next2;
-            });
-          });
           return next;
+        });
+        callRpc(rpc, "fs.listDir", { cwd, relPath: rel, sessionId }).then((value) => {
+          setNodes((prev) => {
+            const next = new Map(prev);
+            next.set(rel, { status: "ready", entries: parseEntries(value.entries) });
+            return next;
+          });
+        }).catch((err) => {
+          setNodes((prev) => {
+            const next = new Map(prev);
+            next.set(rel, { status: "error", error: String(err?.message ?? err) });
+            return next;
+          });
         });
       },
       [cwd, rpc, sessionId]
     );
     const toggle = (0, import_react.useCallback)(
       (rel) => {
-        if (expanded.has(rel)) {
-          setExpanded((prev) => {
-            const next = new Set(prev);
-            next.delete(rel);
-            return next;
-          });
-        } else {
-          setExpanded((prev) => {
-            const next = new Set(prev);
-            next.add(rel);
-            return next;
-          });
-          loadDir(rel);
-        }
+        const wasOpen = expanded.has(rel);
+        setExpanded((prev) => toggleExpanded(prev, rel));
+        if (!wasOpen) loadDir(rel);
       },
       [expanded, loadDir]
     );
@@ -260,44 +261,54 @@ var __dshwt = (() => {
     } else {
       body = (0, import_jsx_runtime2.jsx)("div", {
         "data-wt-tree": true,
-        children: rows.map((row) => {
-          const isOpen = row.isDir && expanded.has(row.rel);
-          return (0, import_jsx_runtime2.jsx)("div", {
-            key: row.rel,
-            role: "button",
-            tabIndex: 0,
-            "data-wt-row": true,
-            "data-dir": row.isDir || void 0,
-            "data-selected": selected === row.rel || void 0,
-            onClick: () => {
-              setSelected(row.rel);
-              if (row.isDir) toggle(row.rel);
-            },
-            onContextMenu: (ev) => openMenu(ev, row),
-            onKeyDown: (ev) => {
-              if (ev.key === "Enter") {
-                ev.preventDefault();
+        children: [
+          rows.map((row) => {
+            const isOpen = row.isDir && expanded.has(row.rel);
+            return (0, import_jsx_runtime2.jsx)("div", {
+              key: row.rel,
+              role: "button",
+              tabIndex: 0,
+              "data-wt-row": true,
+              "data-dir": row.isDir || void 0,
+              "data-selected": selected === row.rel || void 0,
+              onClick: () => {
                 setSelected(row.rel);
                 if (row.isDir) toggle(row.rel);
-              }
-            },
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              padding: "3px 8px",
-              paddingLeft: 8 + row.depth * 14,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              background: selected === row.rel ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
-            },
-            children: [
-              (0, import_jsx_runtime2.jsx)("span", { style: { width: 14, flexShrink: 0, display: "inline-block", textAlign: "center" }, children: row.isDir ? isOpen ? "\u25BE" : "\u25B8" : "" }),
-              (0, import_jsx_runtime2.jsx)("span", { children: fileGlyph(row.name, row.isDir) }),
-              (0, import_jsx_runtime2.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: row.name })
-            ]
-          });
-        })
+              },
+              onContextMenu: (ev) => openMenu(ev, row),
+              onKeyDown: (ev) => {
+                if (ev.key === "Enter") {
+                  ev.preventDefault();
+                  setSelected(row.rel);
+                  if (row.isDir) toggle(row.rel);
+                }
+              },
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "3px 8px",
+                paddingLeft: 8 + row.depth * 14,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                background: selected === row.rel ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
+              },
+              children: [
+                (0, import_jsx_runtime2.jsx)("span", { style: { width: 14, flexShrink: 0, display: "inline-block", textAlign: "center" }, children: row.isDir ? isOpen ? "\u25BE" : "\u25B8" : "" }),
+                (0, import_jsx_runtime2.jsx)("span", { children: fileGlyph(row.name, row.isDir) }),
+                (0, import_jsx_runtime2.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: row.name })
+              ]
+            });
+          }),
+          ...[...expanded].filter((rel) => nodes.get(rel)?.status === "error").map(
+            (rel) => (0, import_jsx_runtime2.jsx)("div", {
+              key: `err-${rel}`,
+              "data-wt-row-error": true,
+              style: { padding: "2px 8px", paddingLeft: 8 + rel.split("/").length * 14, color: "#e06c75", fontSize: "12px" },
+              children: `${rel}: ${nodes.get(rel).error}`
+            })
+          )
+        ]
       });
     }
     return (0, import_jsx_runtime2.jsx)("div", {

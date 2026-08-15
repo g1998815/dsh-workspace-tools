@@ -1,7 +1,7 @@
 import { jsx } from "react/jsx-runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { callRpc } from "../lib/rpc.js";
-import { parseEntries, visibleRows, fileGlyph } from "../lib/fs-tree.js";
+import { parseEntries, visibleRows, fileGlyph, toggleExpanded } from "../lib/fs-tree.js";
 
 // 懒加载文件树：根 = 当前会话 cwd；key=cwd 由父组件控制 → 工作区切换重新挂载（状态清零）。
 // 行右键菜单：复制绝对路径 / 发送到对话框（相对路径追加到输入框末尾）。
@@ -12,6 +12,10 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
   const [menu, setMenu] = useState(null); // {x, y, rel, name, absolute, isDir}
   const panelRef = useRef(null);
   const menuRef = useRef(null);
+  const nodesRef = useRef(nodes);
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
 
   // 根加载（cwd 变化 → 重新挂载语义：清空状态）
   useEffect(() => {
@@ -45,47 +49,38 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
 
   const loadDir = useCallback(
     (rel) => {
+      const current = nodesRef.current.get(rel);
+      if (current && current.status !== "error") return; // 已加载或加载中；error 允许重试
       setNodes((prev) => {
-        if (prev.has(rel)) return prev;
+        if (prev.has(rel) && prev.get(rel).status !== "error") return prev;
         const next = new Map(prev);
         next.set(rel, { status: "loading", entries: [] });
-        callRpc(rpc, "fs.listDir", { cwd, relPath: rel, sessionId })
-          .then((value) => {
-            setNodes((prev2) => {
-              const next2 = new Map(prev2);
-              next2.set(rel, { status: "ready", entries: parseEntries(value.entries) });
-              return next2;
-            });
-          })
-          .catch((err) => {
-            setNodes((prev2) => {
-              const next2 = new Map(prev2);
-              next2.set(rel, { status: "error", error: String(err?.message ?? err) });
-              return next2;
-            });
-          });
         return next;
       });
+      callRpc(rpc, "fs.listDir", { cwd, relPath: rel, sessionId })
+        .then((value) => {
+          setNodes((prev) => {
+            const next = new Map(prev);
+            next.set(rel, { status: "ready", entries: parseEntries(value.entries) });
+            return next;
+          });
+        })
+        .catch((err) => {
+          setNodes((prev) => {
+            const next = new Map(prev);
+            next.set(rel, { status: "error", error: String(err?.message ?? err) });
+            return next;
+          });
+        });
     },
     [cwd, rpc, sessionId],
   );
 
   const toggle = useCallback(
     (rel) => {
-      if (expanded.has(rel)) {
-        setExpanded((prev) => {
-          const next = new Set(prev);
-          next.delete(rel);
-          return next;
-        });
-      } else {
-        setExpanded((prev) => {
-          const next = new Set(prev);
-          next.add(rel);
-          return next;
-        });
-        loadDir(rel);
-      }
+      const wasOpen = expanded.has(rel);
+      setExpanded((prev) => toggleExpanded(prev, rel));
+      if (!wasOpen) loadDir(rel);
     },
     [expanded, loadDir],
   );
@@ -148,44 +143,56 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
   } else {
     body = jsx("div", {
       "data-wt-tree": true,
-      children: rows.map((row) => {
-        const isOpen = row.isDir && expanded.has(row.rel);
-        return jsx("div", {
-          key: row.rel,
-          role: "button",
-          tabIndex: 0,
-          "data-wt-row": true,
-          "data-dir": row.isDir || undefined,
-          "data-selected": selected === row.rel || undefined,
-          onClick: () => {
-            setSelected(row.rel);
-            if (row.isDir) toggle(row.rel);
-          },
-          onContextMenu: (ev) => openMenu(ev, row),
-          onKeyDown: (ev) => {
-            if (ev.key === "Enter") {
-              ev.preventDefault();
+      children: [
+        rows.map((row) => {
+          const isOpen = row.isDir && expanded.has(row.rel);
+          return jsx("div", {
+            key: row.rel,
+            role: "button",
+            tabIndex: 0,
+            "data-wt-row": true,
+            "data-dir": row.isDir || undefined,
+            "data-selected": selected === row.rel || undefined,
+            onClick: () => {
               setSelected(row.rel);
               if (row.isDir) toggle(row.rel);
-            }
-          },
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            padding: "3px 8px",
-            paddingLeft: 8 + row.depth * 14,
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-            background: selected === row.rel ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none",
-          },
-          children: [
-            jsx("span", { style: { width: 14, flexShrink: 0, display: "inline-block", textAlign: "center" }, children: row.isDir ? (isOpen ? "▾" : "▸") : "" }),
-            jsx("span", { children: fileGlyph(row.name, row.isDir) }),
-            jsx("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: row.name }),
-          ],
-        });
-      }),
+            },
+            onContextMenu: (ev) => openMenu(ev, row),
+            onKeyDown: (ev) => {
+              if (ev.key === "Enter") {
+                ev.preventDefault();
+                setSelected(row.rel);
+                if (row.isDir) toggle(row.rel);
+              }
+            },
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "3px 8px",
+              paddingLeft: 8 + row.depth * 14,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              background: selected === row.rel ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none",
+            },
+            children: [
+              jsx("span", { style: { width: 14, flexShrink: 0, display: "inline-block", textAlign: "center" }, children: row.isDir ? (isOpen ? "▾" : "▸") : "" }),
+              jsx("span", { children: fileGlyph(row.name, row.isDir) }),
+              jsx("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: row.name }),
+            ],
+          });
+        }),
+        ...[...expanded]
+          .filter((rel) => nodes.get(rel)?.status === "error")
+          .map((rel) =>
+            jsx("div", {
+              key: `err-${rel}`,
+              "data-wt-row-error": true,
+              style: { padding: "2px 8px", paddingLeft: 8 + (rel.split("/").length) * 14, color: "#e06c75", fontSize: "12px" },
+              children: `${rel}: ${nodes.get(rel).error}`,
+            }),
+          ),
+      ],
     });
   }
 

@@ -40,6 +40,11 @@ test("checkCwdGuard: ok / conflict / session-not-found / missing-session-id åˆ†æ
     requestedCwd: "/a/c",
     existingCwd: "/a/b",
   });
+  assert.deepEqual(checkCwdGuard(session, { sessionId: "s1" }), {
+    status: "conflict",
+    requestedCwd: "",
+    existingCwd: "/a/b",
+  });
   assert.deepEqual(checkCwdGuard(undefined, { sessionId: "s1", cwd: "/a/b" }), { status: "session-not-found" });
   assert.deepEqual(checkCwdGuard(session, { cwd: "/a/b" }), { status: "missing-session-id" });
   assert.deepEqual(checkCwdGuard(session, { sessionId: "", cwd: "/a/b" }), { status: "missing-session-id" });

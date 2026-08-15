@@ -26,7 +26,7 @@ export function visibleRows(nodes, expanded) {
   const walk = (rel, depth) => {
     const node = nodes.get(rel);
     if (!node || node.status !== "ready") return;
-    for (const e of node.entries) {
+    for (const e of node.entries ?? []) {
       const key = joinRel(rel, e.name);
       rows.push({ rel: key, name: e.name, isDir: e.isDir, absolute: e.absolute, depth });
       if (e.isDir && expanded.has(key)) walk(key, depth + 1);
