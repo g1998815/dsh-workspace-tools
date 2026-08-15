@@ -356,52 +356,91 @@ var TABS = [
   { id: "files", label: "\u6587\u4EF6" },
   { id: "changes", label: "\u53D8\u66F4" }
 ];
-function WorkspaceBrowser({ useSessions, rpc, openSession, insertIntoComposer }) {
+function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
+  const [open, setOpen] = (0, import_react2.useState)(true);
   const [tab, setTab] = (0, import_react2.useState)("files");
   const current = useSessions((s) => s.current);
   const cwd = useSessions((s) => s.current ? s.byId[s.current]?.cwd : void 0);
   return (0, import_jsx_runtime3.jsx)("div", {
-    "data-wt-sidebar": true,
+    "data-wt-rail": true,
     style: {
+      position: "absolute",
+      right: 0,
+      top: 0,
+      bottom: 0,
       display: "flex",
-      flexDirection: "column",
-      height: "100%",
-      minHeight: 0,
+      zIndex: 5,
       fontSize: "13px",
       color: "var(--dsw-alias-text-primary, #ddd)"
     },
     children: [
-      (0, import_jsx_runtime3.jsx)("div", {
-        "data-wt-tabs": true,
+      // 收展按钮（面板左侧窄条）
+      (0, import_jsx_runtime3.jsx)("button", {
+        type: "button",
+        "data-wt-toggle": true,
+        "aria-label": open ? "\u6536\u8D77\u5DE5\u5177\u4FA7\u8FB9\u680F" : "\u5C55\u5F00\u5DE5\u5177\u4FA7\u8FB9\u680F",
+        title: open ? "\u6536\u8D77" : "\u5C55\u5F00",
+        onClick: () => setOpen((v) => !v),
         style: {
+          width: 18,
+          border: "none",
+          borderLeft: "1px solid var(--dsw-alias-border-l2, #333)",
+          background: "var(--dsw-alias-bg-float, #1f1f1f)",
+          color: "var(--dsw-alias-text-secondary, #999)",
+          cursor: "pointer",
           display: "flex",
-          borderBottom: "1px solid var(--dsw-alias-border-l2, #333)",
-          flexShrink: 0
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "10px",
+          padding: 0
         },
-        children: TABS.map(
-          (t) => (0, import_jsx_runtime3.jsx)("button", {
-            key: t.id,
-            type: "button",
-            onClick: () => setTab(t.id),
-            "data-active": tab === t.id || void 0,
-            style: {
-              flex: 1,
-              padding: "8px 4px",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: "12px",
-              color: tab === t.id ? "var(--dsw-alias-text-primary, #fff)" : "var(--dsw-alias-text-secondary, #999)",
-              borderBottom: tab === t.id ? "2px solid var(--dsw-alias-accent, #4f8cff)" : "2px solid transparent"
-            },
-            children: t.label
-          })
-        )
+        children: open ? "\u25B8" : "\u25C2"
       }),
-      (0, import_jsx_runtime3.jsx)("div", {
-        "data-wt-tabpanel": true,
-        style: { flex: 1, minHeight: 0, overflow: "auto", padding: "4px 0" },
-        children: tab === "sessions" ? (0, import_jsx_runtime3.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime3.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : (0, import_jsx_runtime3.jsx)("div", { "data-wt-changes-placeholder": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u53D8\u66F4\u5217\u8868\u5C06\u5728 M3 \u63D0\u4F9B" })
+      open && (0, import_jsx_runtime3.jsx)("div", {
+        "data-wt-panel": true,
+        style: {
+          width: 300,
+          background: "var(--dsw-alias-bg-base, #1a1a1a)",
+          borderLeft: "1px solid var(--dsw-alias-border-l2, #333)",
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          minHeight: 0
+        },
+        children: [
+          (0, import_jsx_runtime3.jsx)("div", {
+            "data-wt-tabs": true,
+            style: {
+              display: "flex",
+              borderBottom: "1px solid var(--dsw-alias-border-l2, #333)",
+              flexShrink: 0
+            },
+            children: TABS.map(
+              (t) => (0, import_jsx_runtime3.jsx)("button", {
+                key: t.id,
+                type: "button",
+                onClick: () => setTab(t.id),
+                "data-active": tab === t.id || void 0,
+                style: {
+                  flex: 1,
+                  padding: "8px 4px",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  color: tab === t.id ? "var(--dsw-alias-text-primary, #fff)" : "var(--dsw-alias-text-secondary, #999)",
+                  borderBottom: tab === t.id ? "2px solid var(--dsw-alias-accent, #4f8cff)" : "2px solid transparent"
+                },
+                children: t.label
+              })
+            )
+          }),
+          (0, import_jsx_runtime3.jsx)("div", {
+            "data-wt-tabpanel": true,
+            style: { flex: 1, minHeight: 0, overflow: "auto", padding: "4px 0" },
+            children: tab === "sessions" ? (0, import_jsx_runtime3.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime3.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : (0, import_jsx_runtime3.jsx)("div", { "data-wt-changes-placeholder": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u53D8\u66F4\u5217\u8868\u5C06\u5728 M3 \u63D0\u4F9B" })
+          })
+        ]
       })
     ]
   });
@@ -418,11 +457,11 @@ var name = "dsh-workspace-tools";
 var inject = ["slots", "sessions", "connection"];
 function apply(ctx) {
   ctx.slots.inject(
-    "sidebar.workspaces",
+    "shell.overlay",
     () => ctx.slots.register(
       {
-        name: "sidebar.workspaces",
-        priority: -1,
+        name: "shell.overlay",
+        id: "dsh-workspace-tools",
         inject: () => ({
           rpc: ctx.connection.rpc,
           openSession: (id) => ctx.sessions.open(id),
@@ -440,7 +479,7 @@ function apply(ctx) {
           }
         })
       },
-      WorkspaceBrowser
+      RightSidebar
     )
   );
 }

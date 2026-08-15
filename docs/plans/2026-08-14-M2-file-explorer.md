@@ -1071,3 +1071,12 @@ Expected: 推送成功（可用 `git ls-remote https://github.com/g1998815/dsh-w
 - **M3 变更 + diff**：host `gitDiff` 纯函数（M1 Task 4）已就绪；client 复用 M2 的 `callRpc` 管线与页签框架，把"变更"占位替换为变更列表 + diff 渲染（含未跟踪全文视图）；RPC 端点 `git.listChanges`/`git.getDiff` 已按信封契约修正。
 - **M4 控制台**：client 底部面板 + 多标签 PTY；host `console` 服务（M1 Task 6）与 WS 泵（lib/index.js 未改动段）已就绪；RPC 端点 `console.create/write/kill` 已按信封契约修正（`session-not-found` 用枚举内 code）。
 - **已知缺口（本计划刻意不做）**：文件树无 size/mtime 展示（RPC 未带）；"发送到对话框"为追加末尾而非光标处插入（caret 未发布）；会话页签为最小列表（非 shipped browser 全功能）；`console.create` 的 Windows 真机验证仍属 M4 验收项。
+
+## 改版记录（2026-08-15，用户 UI 要求）
+
+用户验收后提出：插件 UI 不要遮蔽左侧工作区侧边栏，改为**右侧独立工具侧边栏，可点击收起/展开**。已实施：
+
+- `src/index.js`：注册点从 `sidebar.workspaces`（priority -1 遮蔽 shipped browser）改为 **`shell.overlay`**（list 孔 / scope:root，ui-layout 声明的浮层，id `dsh-workspace-tools`）——shipped 工作区浏览器恢复原样，与工具侧边栏互不重合。
+- `src/components/workspace-browser.js`：导出 `RightSidebar`，外壳 = 右缘浮层（absolute right/top/bottom:0，z-index 5，300px 宽）+ 左侧收展按钮（`data-wt-toggle`，收起后仅剩 18px 按钮条）；三段页签内容不变。
+- 构建 `client.js` 并提交；44/44 单测通过（`sidebar.workspaces` 不再出现在 bundle）。
+- **运维教训（实测）**：重启 harness 时 profile 可能被重建（插件 symlink 与 `cordis.patch.yml` 追加行丢失，表现为 `/plugins/<id>/client.js` 404 + RPC 405）——重启后若插件消失，重跑 `node scripts/install.mjs`（幂等）再重启。
