@@ -10,7 +10,7 @@ import { previewKind } from "../lib/preview.js";
 import { tokenize } from "../lib/tokenize.js";
 import { DraggableWindow } from "./draggable-window.js";
 
-const WINDOW_W = 640;
+const WINDOW_W = 960; // M5：原 640 × 1.5（用户需求：默认宽度为原来的 1.5 倍）
 
 const TOKEN_COLORS = { str: "#7ec699", com: "#6a737d", kw: "#61afef", num: "#e6b450" };
 

@@ -36,22 +36,29 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
     window.addEventListener("mouseup", up);
   }, []);
 
+  // M5：收起态四图标（文件/变更/会话/终端）→ 点击展开侧边栏并定位到对应内容
+  const iconTab = useCallback((id) => {
+    setOpen(true);
+    setTab(id);
+  }, []);
+
   return jsx("div", {
     "data-wt-rail": true,
+    "data-collapsed": open ? undefined : true,
     style: {
       position: "absolute",
       right: 0,
       top: 0,
       bottom: 0,
-      width: open ? railW : undefined, // 收起时不占宽：rail 不留隐形拦截层，按钮贴右缘
+      width: open ? railW : 56, // 收起时：56px 窄 rail（同左侧边栏收起样式，M5）
       display: "flex",
       zIndex: 5,
       fontSize: "13px",
       color: "var(--dsw-alias-text-primary, #ddd)",
     },
     children: [
-      // 宽度拖拽把手（rail 首子元素）
-      jsx("div", {
+      // ── 展开态 ──
+      open && jsx("div", {
         "data-wt-resize": true,
         onMouseDown: onResizeDown,
         title: "拖拽调整宽度",
@@ -63,13 +70,12 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
           borderLeft: "1px solid var(--dsw-alias-border-l2, #333)",
         },
       }),
-      // 收展按钮（面板左侧窄条）
-      jsx("button", {
+      open && jsx("button", {
         type: "button",
         "data-wt-toggle": true,
-        "aria-label": open ? "收起工具侧边栏" : "展开工具侧边栏",
-        title: open ? "收起" : "展开",
-        onClick: () => setOpen((v) => !v),
+        "aria-label": "收起工具侧边栏",
+        title: "收起",
+        onClick: () => setOpen(false),
         style: {
           width: 18,
           border: "none",
@@ -83,7 +89,7 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
           fontSize: "10px",
           padding: 0,
         },
-        children: open ? "▸" : "◂",
+        children: "▸",
       }),
       open &&
         jsx("div", {
@@ -156,6 +162,56 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
                   : tab === "files"
                     ? jsx(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer })
                     : jsx(Changes, { cwd, sessionId: current, rpc, onCountChange: setChangeCount }),
+            }),
+          ],
+        }),
+      // ── 收起态：56px 窄 rail，竖排四图标（同左侧边栏收起样式，M5）──
+      !open &&
+        jsx("div", {
+          "data-wt-rail-icons": true,
+          style: {
+            width: 56,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            paddingTop: 6,
+            gap: 4,
+            background: "var(--dsw-alias-bg-float, #1f1f1f)",
+            borderLeft: "1px solid var(--dsw-alias-border-l2, #333)",
+          },
+          children: [
+            jsx("button", {
+              type: "button",
+              "data-wt-icon": "files",
+              title: "文件",
+              onClick: () => iconTab("files"),
+              style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" },
+              children: "📁",
+            }),
+            jsx("button", {
+              type: "button",
+              "data-wt-icon": "changes",
+              title: "变更",
+              onClick: () => iconTab("changes"),
+              style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" },
+              children: "🔀",
+            }),
+            jsx("button", {
+              type: "button",
+              "data-wt-icon": "sessions",
+              title: "会话",
+              onClick: () => iconTab("sessions"),
+              style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" },
+              children: "💬",
+            }),
+            jsx("button", {
+              type: "button",
+              "data-wt-icon": "console",
+              title: "终端",
+              "data-active": consoleOpen || undefined,
+              onClick: () => { setOpen(true); setConsoleOpen(true); },
+              style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" },
+              children: "🖥️",
             }),
           ],
         }),

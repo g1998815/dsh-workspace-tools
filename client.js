@@ -3,18 +3,6 @@ window.__ModuleLoader__.load({
   factory: (require) => {
     var module = { exports: {} };
     var exports = module.exports;
-    // dshwt: browser-globals shim for loader realms that lack them (test vm sandbox; see
-    // test/client-bundle.test.js makeSandbox). Real browsers/Node define these natively, so
-    // this is a no-op there. Required because bundled @xterm/xterm reads them at module top
-    // level: queueMicrotask (_e.EMPTY = _e.fromArray([])) and navigator (browser detection).
-    if (typeof globalThis !== "undefined") {
-      if (typeof queueMicrotask === "undefined") {
-        globalThis.queueMicrotask = function (cb) { Promise.resolve().then(cb); };
-      }
-      if (typeof navigator === "undefined") {
-        globalThis.navigator = { userAgent: "", platform: "", language: "", maxTouchPoints: 0 };
-      }
-    }
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -265,7 +253,8 @@ var WT = {
     close: "data-wt-window-close",
     search: "data-wt-window-search",
     prev: "data-wt-window-prev",
-    next: "data-wt-window-next"
+    next: "data-wt-window-next",
+    resize: "data-wt-window-resize"
   },
   diff: {
     root: "data-wt-diff-window",
@@ -274,7 +263,8 @@ var WT = {
     close: "data-wt-diff-close",
     search: "data-wt-diff-search",
     prev: "data-wt-diff-prev",
-    next: "data-wt-diff-next"
+    next: "data-wt-diff-next",
+    resize: "data-wt-diff-resize"
   },
   preview: {
     root: "data-wt-preview-window",
@@ -283,16 +273,27 @@ var WT = {
     close: "data-wt-preview-close",
     search: "data-wt-preview-search",
     prev: "data-wt-preview-prev",
-    next: "data-wt-preview-next"
+    next: "data-wt-preview-next",
+    resize: "data-wt-preview-resize"
   }
 };
+var MIN_W = 320;
+var MIN_H = 240;
+var DEF_H_RATIO = 0.68 * 1.2;
 function DraggableWindow({ title, badge, width = 640, onClose, search, wtPrefix = "window", children }) {
   const wt2 = WT[wtPrefix] ?? WT.window;
+  const [size, setSize] = (0, import_react.useState)(() => {
+    const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+    return { w: width, h: Math.max(MIN_H, Math.round(vh * DEF_H_RATIO)) };
+  });
   const [pos, setPos] = (0, import_react.useState)(() => {
     const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
-    return { x: Math.max(8, vw - width - 24), y: 64 };
+    const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+    const h2 = Math.max(MIN_H, Math.round(vh * DEF_H_RATIO));
+    return { x: Math.max(8, Math.round((vw - width) / 2)), y: Math.max(8, Math.round((vh - h2) / 2)) };
   });
   const dragRef = (0, import_react.useRef)(null);
+  const resizeRef = (0, import_react.useRef)(null);
   const onTitleDown = (0, import_react.useCallback)(
     (e) => {
       if (e.target.closest("input,button")) return;
@@ -309,6 +310,26 @@ function DraggableWindow({ title, badge, width = 640, onClose, search, wtPrefix 
     },
     [pos]
   );
+  const onResizeDown = (0, import_react.useCallback)(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      resizeRef.current = { sx: e.clientX, sy: e.clientY, sw: size.w, sh: size.h };
+      const move = (ev) => {
+        setSize({
+          w: Math.max(MIN_W, resizeRef.current.sw + (ev.clientX - resizeRef.current.sx)),
+          h: Math.max(MIN_H, resizeRef.current.sh + (ev.clientY - resizeRef.current.sy))
+        });
+      };
+      const up = () => {
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    },
+    [size]
+  );
   const hasQuery = search != null && search.value.trim() !== "";
   const rootAttrs = { "data-wt-window": true };
   if (wtPrefix !== "window") rootAttrs[wt2.root] = true;
@@ -318,10 +339,12 @@ function DraggableWindow({ title, badge, width = 640, onClose, search, wtPrefix 
       position: "fixed",
       left: pos.x,
       top: pos.y,
-      width,
+      width: size.w,
+      height: size.h,
       maxWidth: "94vw",
-      height: "68vh",
-      minHeight: 240,
+      maxHeight: "92vh",
+      minWidth: MIN_W,
+      minHeight: MIN_H,
       display: "flex",
       flexDirection: "column",
       background: "var(--dsw-alias-bg-base, #1a1a1a)",
@@ -382,13 +405,35 @@ function DraggableWindow({ title, badge, width = 640, onClose, search, wtPrefix 
           hasQuery && (0, import_jsx_runtime2.jsx)("button", { type: "button", [wt2.next]: true, onClick: search.onNext, style: BTN, children: "\u2193" })
         ]
       }),
-      children
+      // 内容区（flex:1 滚动由子组件自管；此处 overflow hidden 由根容器保证）
+      (0, import_jsx_runtime2.jsx)("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }, children }),
+      // 右下角 resize 把手
+      (0, import_jsx_runtime2.jsx)("div", {
+        [wt2.resize]: true,
+        onMouseDown: onResizeDown,
+        title: "\u62D6\u62FD\u8C03\u6574\u5927\u5C0F",
+        style: {
+          position: "absolute",
+          right: 0,
+          bottom: 0,
+          width: 16,
+          height: 16,
+          cursor: "nwse-resize",
+          flexShrink: 0,
+          zIndex: 2,
+          background: "linear-gradient(135deg, transparent 50%, var(--dsw-alias-text-secondary, #555) 50%)",
+          backgroundSize: "10px 10px",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "bottom right",
+          opacity: 0.6
+        }
+      })
     ]
   });
 }
 
 // src/components/preview-window.js
-var WINDOW_W = 640;
+var WINDOW_W = 960;
 var TOKEN_COLORS = { str: "#7ec699", com: "#6a737d", kw: "#61afef", num: "#e6b450" };
 var MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", bmp: "image/bmp", ico: "image/x-icon", avif: "image/avif" };
 function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
@@ -611,10 +656,21 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
   const openMenu = (0, import_react3.useCallback)((ev, row) => {
     ev.preventDefault();
     ev.stopPropagation();
+    setSelected(row.rel);
     const rect = panelRef.current?.getBoundingClientRect();
     setMenu({ x: ev.clientX - (rect?.left ?? 0), y: ev.clientY - (rect?.top ?? 0), ...row });
   }, []);
   const closeMenu = (0, import_react3.useCallback)(() => setMenu(null), []);
+  const canOpen = menu && !menu.isDir && previewKind(menu.name);
+  const onOpenFromMenu = (0, import_react3.useCallback)(() => {
+    if (!menu || menu.isDir) {
+      closeMenu();
+      return;
+    }
+    const kind = previewKind(menu.name);
+    if (kind) setPreview({ rel: menu.rel, name: menu.name });
+    closeMenu();
+  }, [menu, closeMenu]);
   const onCopy = (0, import_react3.useCallback)(async () => {
     if (!menu) return;
     try {
@@ -655,9 +711,6 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
               setSelected(row.rel);
               if (row.isDir) {
                 toggle(row.rel);
-              } else {
-                const kind = previewKind(row.name);
-                if (kind) setPreview({ rel: row.rel, name: row.name });
               }
             },
             onContextMenu: (ev) => openMenu(ev, row),
@@ -735,6 +788,14 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
           padding: 4
         },
         children: [
+          // M5：打开（仅文件且可预览时显示）
+          canOpen && (0, import_jsx_runtime4.jsx)("div", {
+            role: "menuitem",
+            "data-wt-menu-open": true,
+            onClick: onOpenFromMenu,
+            style: { padding: "6px 10px", cursor: "pointer", borderRadius: 4 },
+            children: "\u6253\u5F00"
+          }),
           (0, import_jsx_runtime4.jsx)("div", {
             role: "menuitem",
             onClick: onCopy,
@@ -916,7 +977,7 @@ function DiffLines({ lines, matches = [] }) {
 }
 
 // src/components/diff-window.js
-var WINDOW_W2 = 720;
+var WINDOW_W2 = 1080;
 function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
   const [query, setQuery] = (0, import_react4.useState)("");
   const [matchIdx, setMatchIdx] = (0, import_react4.useState)(0);
@@ -1073,7 +1134,8 @@ function CommitDetailWindow({ target, cwd, sessionId, rpc, onClose }) {
   return (0, import_jsx_runtime7.jsx)(DraggableWindow, {
     title: `${target} \u7684\u53D8\u66F4`,
     badge: `${files ? files.length : "\u2026"} \u4E2A\u6587\u4EF6`,
-    width: 720,
+    width: 1080,
+    // M5：原 720 × 1.5（用户需求：默认宽度为原来的 1.5 倍）
     onClose,
     children: body
   });
@@ -11112,7 +11174,7 @@ if (typeof document !== "undefined" && typeof document.getElementById === "funct
   s15.textContent = xterm_default;
   document.head.appendChild(s15);
 }
-var MIN_H = 120;
+var MIN_H2 = 120;
 var MAX_H = 480;
 var ROWS = 40;
 var COLS = 120;
@@ -11122,6 +11184,7 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
   const [active, setActive] = (0, import_react7.useState)(null);
   const [panelError, setPanelError] = (0, import_react7.useState)(null);
   const mountRefs = (0, import_react7.useRef)({});
+  const cancelledRef = (0, import_react7.useRef)(/* @__PURE__ */ new Set());
   const seq = (0, import_react7.useRef)(0);
   const addTab = (0, import_react7.useCallback)(() => {
     if (!cwd) {
@@ -11129,17 +11192,27 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
       return;
     }
     const id = `c${++seq.current}`;
-    const tab = { id, ttyId: null, status: "starting", title: `\u7EC8\u7AEF ${tabs.length + 1}` };
+    const tab = { id, ttyId: null, status: "starting", title: `\u7EC8\u7AEF ${seq.current}` };
     setTabs((prev) => [...prev, tab]);
     setActive(id);
     setPanelError(null);
-    callRpc(rpc, "console.create", { cwd, sessionId }).then((value) => {
+    callRpc(rpc, "console.create", { cwd, sessionId, rows: ROWS, cols: COLS }).then((value) => {
+      if (cancelledRef.current.has(id)) {
+        cancelledRef.current.delete(id);
+        callRpc(rpc, "console.kill", { sessionId: value.sessionId }).catch(() => {
+        });
+        return;
+      }
       setTabs((prev) => prev.map((t) => t.id === id ? { ...t, ttyId: value.sessionId, status: "running" } : t));
     }).catch((err) => {
+      if (cancelledRef.current.has(id)) {
+        cancelledRef.current.delete(id);
+        return;
+      }
       setTabs((prev) => prev.map((t) => t.id === id ? { ...t, status: "exited" } : t));
       setPanelError(String(err?.message ?? err));
     });
-  }, [cwd, rpc, sessionId, tabs.length]);
+  }, [cwd, rpc, sessionId]);
   (0, import_react7.useEffect)(() => {
     for (const tab of tabs) {
       if (tab.status !== "running" || !tab.ttyId) continue;
@@ -11160,6 +11233,7 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
         ws2.send(JSON.stringify({ sessionId: tab.ttyId }));
       };
       ws2.onmessage = (ev) => {
+        if (!mountRefs.current[tab.id]) return;
         const text = typeof ev.data === "string" ? ev.data : new TextDecoder().decode(ev.data);
         try {
           const msg = JSON.parse(text);
@@ -11203,7 +11277,35 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
     });
     return () => cancelAnimationFrame(raf);
   }, [open, active]);
+  (0, import_react7.useEffect)(() => {
+    if (typeof document === "undefined") return;
+    const frame = document.querySelector('[class$="_frame"]');
+    if (!frame) return;
+    if (open) {
+      frame.style.gridTemplateRows = `1fr ${height}px`;
+      let spacer = document.getElementById("dshwt-console-spacer");
+      if (!spacer) {
+        spacer = document.createElement("div");
+        spacer.id = "dshwt-console-spacer";
+        spacer.setAttribute("data-wt-console-spacer", "true");
+        spacer.style.gridRow = "2";
+        spacer.style.gridColumn = "1 / -1";
+        spacer.style.height = `${height}px`;
+        frame.appendChild(spacer);
+      } else {
+        spacer.style.height = `${height}px`;
+      }
+    } else {
+      frame.style.gridTemplateRows = "";
+      document.getElementById("dshwt-console-spacer")?.remove();
+    }
+    return () => {
+      frame.style.gridTemplateRows = "";
+      document.getElementById("dshwt-console-spacer")?.remove();
+    };
+  }, [open, height]);
   const closeTab = (0, import_react7.useCallback)((tab) => {
+    if (!tab.ttyId) cancelledRef.current.add(tab.id);
     if (tab.ttyId) {
       callRpc(rpc, "console.kill", { sessionId: tab.ttyId }).catch(() => {
       });
@@ -11218,7 +11320,7 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
   const onDragDown = (0, import_react7.useCallback)((e) => {
     const startY = e.clientY;
     const startH = height;
-    const move = (ev) => setHeight(Math.min(MAX_H, Math.max(MIN_H, startH + (startY - ev.clientY))));
+    const move = (ev) => setHeight(Math.min(MAX_H, Math.max(MIN_H2, startH + (startY - ev.clientY))));
     const up = () => {
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
@@ -11299,23 +11401,28 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   }, []);
+  const iconTab = (0, import_react8.useCallback)((id) => {
+    setOpen(true);
+    setTab(id);
+  }, []);
   return (0, import_jsx_runtime10.jsx)("div", {
     "data-wt-rail": true,
+    "data-collapsed": open ? void 0 : true,
     style: {
       position: "absolute",
       right: 0,
       top: 0,
       bottom: 0,
-      width: open ? railW : void 0,
-      // 收起时不占宽：rail 不留隐形拦截层，按钮贴右缘
+      width: open ? railW : 56,
+      // 收起时：56px 窄 rail（同左侧边栏收起样式，M5）
       display: "flex",
       zIndex: 5,
       fontSize: "13px",
       color: "var(--dsw-alias-text-primary, #ddd)"
     },
     children: [
-      // 宽度拖拽把手（rail 首子元素）
-      (0, import_jsx_runtime10.jsx)("div", {
+      // ── 展开态 ──
+      open && (0, import_jsx_runtime10.jsx)("div", {
         "data-wt-resize": true,
         onMouseDown: onResizeDown,
         title: "\u62D6\u62FD\u8C03\u6574\u5BBD\u5EA6",
@@ -11327,13 +11434,12 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
           borderLeft: "1px solid var(--dsw-alias-border-l2, #333)"
         }
       }),
-      // 收展按钮（面板左侧窄条）
-      (0, import_jsx_runtime10.jsx)("button", {
+      open && (0, import_jsx_runtime10.jsx)("button", {
         type: "button",
         "data-wt-toggle": true,
-        "aria-label": open ? "\u6536\u8D77\u5DE5\u5177\u4FA7\u8FB9\u680F" : "\u5C55\u5F00\u5DE5\u5177\u4FA7\u8FB9\u680F",
-        title: open ? "\u6536\u8D77" : "\u5C55\u5F00",
-        onClick: () => setOpen((v2) => !v2),
+        "aria-label": "\u6536\u8D77\u5DE5\u5177\u4FA7\u8FB9\u680F",
+        title: "\u6536\u8D77",
+        onClick: () => setOpen(false),
         style: {
           width: 18,
           border: "none",
@@ -11347,7 +11453,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
           fontSize: "10px",
           padding: 0
         },
-        children: open ? "\u25B8" : "\u25C2"
+        children: "\u25B8"
       }),
       open && (0, import_jsx_runtime10.jsx)("div", {
         "data-wt-panel": true,
@@ -11414,6 +11520,58 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
             "data-wt-tabpanel": true,
             style: { flex: 1, minHeight: 0, overflow: "auto", padding: "4px 0" },
             children: tab === "sessions" ? (0, import_jsx_runtime10.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime10.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : (0, import_jsx_runtime10.jsx)(Changes, { cwd, sessionId: current, rpc, onCountChange: setChangeCount })
+          })
+        ]
+      }),
+      // ── 收起态：56px 窄 rail，竖排四图标（同左侧边栏收起样式，M5）──
+      !open && (0, import_jsx_runtime10.jsx)("div", {
+        "data-wt-rail-icons": true,
+        style: {
+          width: 56,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          paddingTop: 6,
+          gap: 4,
+          background: "var(--dsw-alias-bg-float, #1f1f1f)",
+          borderLeft: "1px solid var(--dsw-alias-border-l2, #333)"
+        },
+        children: [
+          (0, import_jsx_runtime10.jsx)("button", {
+            type: "button",
+            "data-wt-icon": "files",
+            title: "\u6587\u4EF6",
+            onClick: () => iconTab("files"),
+            style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" },
+            children: "\u{1F4C1}"
+          }),
+          (0, import_jsx_runtime10.jsx)("button", {
+            type: "button",
+            "data-wt-icon": "changes",
+            title: "\u53D8\u66F4",
+            onClick: () => iconTab("changes"),
+            style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" },
+            children: "\u{1F500}"
+          }),
+          (0, import_jsx_runtime10.jsx)("button", {
+            type: "button",
+            "data-wt-icon": "sessions",
+            title: "\u4F1A\u8BDD",
+            onClick: () => iconTab("sessions"),
+            style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" },
+            children: "\u{1F4AC}"
+          }),
+          (0, import_jsx_runtime10.jsx)("button", {
+            type: "button",
+            "data-wt-icon": "console",
+            title: "\u7EC8\u7AEF",
+            "data-active": consoleOpen || void 0,
+            onClick: () => {
+              setOpen(true);
+              setConsoleOpen(true);
+            },
+            style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" },
+            children: "\u{1F5A5}\uFE0F"
           })
         ]
       }),

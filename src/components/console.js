@@ -30,25 +30,33 @@ export function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
   const [active, setActive] = useState(null); // tab id
   const [panelError, setPanelError] = useState(null);
   const mountRefs = useRef({}); // tabId -> {term, fit, ws}
+  const cancelledRef = useRef(new Set()); // 关闭时 create 未 resolve 的 tabId（resolve 后补 kill，M4-A6）
   const seq = useRef(0);
 
   // 新建标签
   const addTab = useCallback(() => {
     if (!cwd) { setPanelError("当前会话没有工作目录"); return; }
     const id = `c${++seq.current}`;
-    const tab = { id, ttyId: null, status: "starting", title: `终端 ${tabs.length + 1}` };
+    const tab = { id, ttyId: null, status: "starting", title: `终端 ${seq.current}` };
     setTabs((prev) => [...prev, tab]);
     setActive(id);
     setPanelError(null);
-    callRpc(rpc, "console.create", { cwd, sessionId })
+    callRpc(rpc, "console.create", { cwd, sessionId, rows: ROWS, cols: COLS })
       .then((value) => {
+        if (cancelledRef.current.has(id)) {
+          // 标签在 create resolve 前被关闭：补 kill，避免孤儿会话
+          cancelledRef.current.delete(id);
+          callRpc(rpc, "console.kill", { sessionId: value.sessionId }).catch(() => {});
+          return;
+        }
         setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, ttyId: value.sessionId, status: "running" } : t)));
       })
       .catch((err) => {
+        if (cancelledRef.current.has(id)) { cancelledRef.current.delete(id); return; }
         setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, status: "exited" } : t)));
         setPanelError(String(err?.message ?? err)); // Windows 等：spawnTerminal 不支持 → 结构化错误
       });
-  }, [cwd, rpc, sessionId, tabs.length]);
+  }, [cwd, rpc, sessionId]);
 
   // 挂载 effect：增量挂载每个 running 标签的 xterm + WS。
   // 注意与 brief 源不同：这里**不返回清理函数**（React 会在每次 tabs 变化重跑 effect 前执行上次的清理，
@@ -72,6 +80,7 @@ export function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
         ws.send(JSON.stringify({ sessionId: tab.ttyId }));
       };
       ws.onmessage = (ev) => {
+        if (!mountRefs.current[tab.id]) return; // 已关闭/dispose（M4-A7：write-after-dispose 防御）
         const text = typeof ev.data === "string" ? ev.data : new TextDecoder().decode(ev.data);
         try {
           const msg = JSON.parse(text);
@@ -117,8 +126,40 @@ export function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
     return () => cancelAnimationFrame(raf);
   }, [open, active]);
 
+  // 布局：面板展开时把 dsh frame 的底部让出 height 高度（grid 第二行占位），
+  // 主内容区（含输入框）随之压缩上移 —— 面板与主页面同层，不再浮层遮挡输入框（用户 2026-08-15 改版）。
+  // 收起/卸载时恢复原 grid 行定义。
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const frame = document.querySelector('[class$="_frame"]');
+    if (!frame) return;
+    if (open) {
+      frame.style.gridTemplateRows = `1fr ${height}px`;
+      let spacer = document.getElementById("dshwt-console-spacer");
+      if (!spacer) {
+        spacer = document.createElement("div");
+        spacer.id = "dshwt-console-spacer";
+        spacer.setAttribute("data-wt-console-spacer", "true");
+        spacer.style.gridRow = "2";
+        spacer.style.gridColumn = "1 / -1";
+        spacer.style.height = `${height}px`;
+        frame.appendChild(spacer);
+      } else {
+        spacer.style.height = `${height}px`;
+      }
+    } else {
+      frame.style.gridTemplateRows = "";
+      document.getElementById("dshwt-console-spacer")?.remove();
+    }
+    return () => {
+      frame.style.gridTemplateRows = "";
+      document.getElementById("dshwt-console-spacer")?.remove();
+    };
+  }, [open, height]);
+
   // 关闭标签
   const closeTab = useCallback((tab) => {
+    if (!tab.ttyId) cancelledRef.current.add(tab.id); // create 未 resolve：resolve 后补 kill
     if (tab.ttyId) {
       callRpc(rpc, "console.kill", { sessionId: tab.ttyId }).catch(() => {});
     }

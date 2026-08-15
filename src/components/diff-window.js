@@ -11,7 +11,7 @@ import { statusLabel } from "../lib/git-changes.js";
 import { DraggableWindow } from "./draggable-window.js";
 import { DiffLines } from "./diff-lines.js";
 
-const WINDOW_W = 720;
+const WINDOW_W = 1080; // M5：原 720 × 1.5（用户需求：默认宽度为原来的 1.5 倍）
 
 export function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
   const [query, setQuery] = useState("");

@@ -7,7 +7,8 @@ import { PreviewWindow } from "./preview-window.js";
 import { previewKind } from "../lib/preview.js";
 
 // 懒加载文件树：根 = 当前会话 cwd；key=cwd 由父组件控制 → 工作区切换重新挂载（状态清零）。
-// 行右键菜单：复制绝对路径 / 发送到对话框（相对路径追加到输入框末尾）。
+// M5 交互改版：点击行仅**选中**（不高亮打开）；右键菜单“打开”才打开预览。
+// 行右键菜单：打开 / 复制绝对路径 / 发送到对话框（相对路径追加到输入框末尾）。
 export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
   const [nodes, setNodes] = useState(() => new Map());
   const [expanded, setExpanded] = useState(() => new Set());
@@ -113,11 +114,21 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
   const openMenu = useCallback((ev, row) => {
     ev.preventDefault();
     ev.stopPropagation();
+    setSelected(row.rel); // 右键也视为选中（M5：点击选中、右键菜单打开）
     const rect = panelRef.current?.getBoundingClientRect();
     setMenu({ x: ev.clientX - (rect?.left ?? 0), y: ev.clientY - (rect?.top ?? 0), ...row });
   }, []);
 
   const closeMenu = useCallback(() => setMenu(null), []);
+
+  // M5：右键菜单“打开”——仅文件且可预览时可用
+  const canOpen = menu && !menu.isDir && previewKind(menu.name);
+  const onOpenFromMenu = useCallback(() => {
+    if (!menu || menu.isDir) { closeMenu(); return; }
+    const kind = previewKind(menu.name);
+    if (kind) setPreview({ rel: menu.rel, name: menu.name });
+    closeMenu();
+  }, [menu, closeMenu]);
 
   const onCopy = useCallback(async () => {
     if (!menu) return;
@@ -159,12 +170,9 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
             "data-dir": row.isDir || undefined,
             "data-selected": selected === row.rel || undefined,
             onClick: () => {
-              setSelected(row.rel);
+              setSelected(row.rel); // M5：点击仅选中，不打开
               if (row.isDir) {
                 toggle(row.rel);
-              } else {
-                const kind = previewKind(row.name);
-                if (kind) setPreview({ rel: row.rel, name: row.name });
               }
             },
             onContextMenu: (ev) => openMenu(ev, row),
@@ -246,6 +254,15 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
             padding: 4,
           },
           children: [
+            // M5：打开（仅文件且可预览时显示）
+            canOpen &&
+              jsx("div", {
+                role: "menuitem",
+                "data-wt-menu-open": true,
+                onClick: onOpenFromMenu,
+                style: { padding: "6px 10px", cursor: "pointer", borderRadius: 4 },
+                children: "打开",
+              }),
             jsx("div", {
               role: "menuitem",
               onClick: onCopy,

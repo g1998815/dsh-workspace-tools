@@ -27,6 +27,9 @@ function makeSandbox() {
       querySelectorAll: () => [],
     },
     console,
+    // 浏览器原生全局（xterm 模块顶层读取；vm 沙箱不自动提供 → 显式补上，M4-A13b）
+    queueMicrotask: (cb) => Promise.resolve().then(cb),
+    navigator: { userAgent: "", platform: "", language: "", maxTouchPoints: 0 },
   };
   sandbox.window.__ModuleLoader__ = {
     load: (handoff) => {

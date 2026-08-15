@@ -100,7 +100,7 @@ export function CommitDetailWindow({ target, cwd, sessionId, rpc, onClose }) {
   return jsx(DraggableWindow, {
     title: `${target} 的变更`,
     badge: `${files ? files.length : "…"} 个文件`,
-    width: 720,
+    width: 1080, // M5：原 720 × 1.5（用户需求：默认宽度为原来的 1.5 倍）
     onClose,
     children: body,
   });
