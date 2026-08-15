@@ -352,9 +352,9 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
 
 // src/components/workspace-browser.js
 var TABS = [
-  { id: "sessions", label: "\u4F1A\u8BDD" },
   { id: "files", label: "\u6587\u4EF6" },
-  { id: "changes", label: "\u53D8\u66F4" }
+  { id: "changes", label: "\u53D8\u66F4" },
+  { id: "sessions", label: "\u4F1A\u8BDD" }
 ];
 function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
   const [open, setOpen] = (0, import_react2.useState)(true);

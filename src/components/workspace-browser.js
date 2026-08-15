@@ -3,10 +3,11 @@ import { useState } from "react";
 import { SessionList } from "./session-list.js";
 import { FileTree } from "./file-tree.js";
 
+// 页签顺序（2026-08-15 用户定）：文件 → 变更 → 会话（会话放最后）
 const TABS = [
-  { id: "sessions", label: "会话" },
   { id: "files", label: "文件" },
   { id: "changes", label: "变更" },
+  { id: "sessions", label: "会话" },
 ];
 
 // 右侧独立侧边栏（2026-08-15 用户要求改版）：
