@@ -76,7 +76,7 @@ test("fs.listDir: 合法请求 → ok + entries（FsTarget 契约：resolve 返�
       const abs = p.startsWith("/") ? p : `${base}/${p}`;
       return { targetKey: abs, displayPath: abs };
     },
-    listDir: async (t) => [{ name: "a.txt", type: "file", target: `${t.targetKey}/a.txt` }],
+    listDir: async (t) => [{ name: "a.txt", type: "file", target: { targetKey: `${t.targetKey}/a.txt`, displayPath: `${t.displayPath}/a.txt` } }],
     processPath: (t) => String(t.targetKey),
   });
   sessions.set("s1", { header: { cwd: "/w" } });
