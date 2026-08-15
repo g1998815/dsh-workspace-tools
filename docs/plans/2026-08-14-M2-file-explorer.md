@@ -13,7 +13,7 @@
   1. host `rpcFetchHandler` 调用 handler 的签名是 **`handler(endpoint, payload, signal)`**（M1 写成 `(payload)` 且 switch `payload.op` → 实际永远走 default）。
   2. handler 返回值**直接**进入 `{type:"server-response", rpcId, result}`；client 端 `createWebConnectionRpc.call` 用 `serverResponseSchema` **严格解析** result 为 `{ok:true, value}` 或 `{ok:false, error:{code,message,details}}`——M1 直接返回 `{changes:...}` 会在 client 解析层抛 schema 异常。
   3. **`error.code` 是封闭枚举**（`rpcErrorSchema` 的 discriminatedUnion，共 40 个预置 code，含 `bad-request` / `cancelled` / `session-not-found` / `internal` 等）；插件自定义 code（`dir-not-found`、`git-not-found`…）**不能**原样进信封 → 统一映射为 `internal`，原 code 嵌入 message（`[dir-not-found] …`）。
-- **cwd 校验（M2 落地 M1 终审遗留项）**：client 每次 RPC 携带 `sessionId`；host 端 `ctx.sessions.get(sessionId)?.header.cwd` 与 `payload.cwd` 不一致即拒绝（`cwd-mismatch` → `internal` 信封）。sessionId 缺省时跳过（向后兼容，RPC 本身已限 loopback）。
+- **cwd 校验（M2 落地 M1 终审遗留项；2026-08-15 用户裁定 fail-closed）**：client 每次 RPC 携带 UI 会话 `sessionId`；host 端带 cwd 的 op（git/fs/console.create）强制要求 sessionId——缺失 → `bad-request`、未知会话 → `session-not-found`、`ctx.sessions.get(sessionId)?.header.cwd` 与 `payload.cwd` 不一致 → `session-conflict`（枚举内 code，details `{sessionId, requestedCwd, existingCwd}`）。不再有"缺省跳过"的宽松路径。
 - **dotfile 策略统一（M1 终审遗留项）**：纯函数 `listDir` 的 HIDDEN 集合（仅 `.git`/`.DS_Store`）与 RPC 路径 `startsWith(".")` 不一致 → 统一为**隐藏所有以 `.` 开头的条目**（spec §5.2 的两个名字是最低要求；全 dotfile 隐藏是文件浏览器标准行为，且与 ctx.fs RPC 路径现行为一致）。
 - **"发送到对话框"= 追加末尾**（caret 未发布，M1 §12 已定退化方案）：经 `ctx.get("conversation").input.shell(sessionId).state.getSnapshot().draft` 读当前 draft，`shell.actions.setDraft(composeDraftInsert(draft, relPath))` 整草稿替换（走完整 machine 事务，无 CAS 问题）。`useInput`/`inputActions` 是 session-scope 标准 prop，`sidebar.workspaces` 是 root-scope，**拿不到**——这是 root 侧唯一干净路径（已实测 `ConversationController extends Service("conversation")`、`input.shell(id)`、`shell.state` snapshot store、`shell.actions.setDraft` 全部存在）。
 - **size/mtime 不进 RPC**（YAGNI：树只显示名字；纯函数 `listDir` 已带 size/mtime 备用，spec §5.1 的完整字段后续需要时再补）。
@@ -44,7 +44,7 @@
 **Interfaces:**
 - Produces:
   - `lib/constants.js`: `export const RPC_CHANNEL = "/workspace-tools"`、`export const WS_PATH = "/plugins/dsh-workspace-tools/console"`
-  - `lib/rpc.js`: `ok(value) → {ok:true, value}`；`fail(code, message, details={}) → {ok:false, error:{code,message,details}}`；`failFrom(err) → {ok:false, error:{code:"internal", message:"[<原code>] <原message>", details:{}}}`；`assertCwdMatchesSession(headerCwd, cwd)`（不匹配时 throw `{code:"cwd-mismatch", message}`；`headerCwd === undefined` 时跳过）
+  - `lib/rpc.js`: `ok(value) → {ok:true, value}`；`fail(code, message, details={}) → {ok:false, error:{code,message,details}}`；`failFrom(err) → {ok:false, error:{code:"internal", message:"[<原code>] <原message>", details:{}}}`；`checkCwdGuard(session, payload) → {status:"ok"|"missing-session-id"|"session-not-found"|"conflict", requestedCwd?, existingCwd?}`（**fail-closed**：sessionId 非 string/空 → missing-session-id；session 不存在 → session-not-found；`session.header.cwd !== payload.cwd` → conflict；其余 → ok。2026-08-15 按用户裁定替换原 `assertCwdMatchesSession`）
   - `lib/index.js`：host inject 追加 `"sessions"`；RPC handler 签名 `(endpoint, payload)`，按 endpoint 分发，全部返回信封
 - Consumes: 既有三服务纯函数（`listChanges`/`getDiff`/`resolvePath`/`createShellSession`）+ `ctx.fs`/`ctx.subprocess`/`ctx.sessions`。
 
@@ -55,7 +55,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { RPC_CHANNEL, WS_PATH } from "../lib/constants.js";
-import { ok, fail, failFrom, assertCwdMatchesSession } from "../lib/rpc.js";
+import { ok, fail, failFrom, checkCwdGuard } from "../lib/rpc.js";
 
 test("constants: RPC_CHANNEL 为单级路径且非保留字", () => {
   assert.match(RPC_CHANNEL, /^\/[A-Za-z0-9._~-]+$/); // CHANNEL_PATTERN
@@ -85,10 +85,18 @@ test("failFrom: 无 code 的异常也能映射", () => {
   assert.match(e.error.message, /kaboom/);
 });
 
-test("assertCwdMatchesSession: 匹配通过 / 不匹配抛 cwd-mismatch / 无 header 跳过", () => {
-  assert.doesNotThrow(() => assertCwdMatchesSession("/a/b", "/a/b"));
-  assert.doesNotThrow(() => assertCwdMatchesSession(undefined, "/a/b"));
-  assert.throws(() => assertCwdMatchesSession("/a/b", "/a/c"), (err) => err.code === "cwd-mismatch");
+test("checkCwdGuard: ok / conflict / session-not-found / missing-session-id 分派", () => {
+  const session = { header: { cwd: "/a/b" } };
+  assert.deepEqual(checkCwdGuard(session, { sessionId: "s1", cwd: "/a/b" }), { status: "ok" });
+  assert.deepEqual(checkCwdGuard(session, { sessionId: "s1", cwd: "/a/c" }), {
+    status: "conflict",
+    requestedCwd: "/a/c",
+    existingCwd: "/a/b",
+  });
+  assert.deepEqual(checkCwdGuard(undefined, { sessionId: "s1", cwd: "/a/b" }), { status: "session-not-found" });
+  assert.deepEqual(checkCwdGuard(session, { cwd: "/a/b" }), { status: "missing-session-id" });
+  assert.deepEqual(checkCwdGuard(session, { sessionId: "", cwd: "/a/b" }), { status: "missing-session-id" });
+  assert.deepEqual(checkCwdGuard(session, undefined), { status: "missing-session-id" });
 });
 ```
 
@@ -129,12 +137,18 @@ export function failFrom(err) {
   return fail("internal", `[${code ?? "error"}] ${message}`);
 }
 
-// cwd 必须等于当前会话 header.cwd（host 无"当前活动工作区"概念，以会话 header 为准）
-export function assertCwdMatchesSession(headerCwd, cwd) {
-  if (headerCwd === undefined) return;
-  if (headerCwd !== cwd) {
-    throw { code: "cwd-mismatch", message: `cwd 与当前会话工作区不一致: ${cwd} ≠ ${headerCwd}` };
+// cwd 校验（fail-closed，用户裁定 2026-08-15）：带 cwd 的 op 必须携带当前 UI 会话 sessionId；
+// 未知会话 / cwd 与会话 header 不一致一律拒绝。session 为 ctx.sessions.get(sessionId) 的结果
+// （含 undefined），payload 为 RPC 入参。
+export function checkCwdGuard(session, payload) {
+  if (typeof payload?.sessionId !== "string" || payload.sessionId === "") {
+    return { status: "missing-session-id" };
   }
+  if (!session) return { status: "session-not-found" };
+  if (session.header?.cwd !== payload.cwd) {
+    return { status: "conflict", requestedCwd: payload.cwd, existingCwd: session.header.cwd };
+  }
+  return { status: "ok" };
 }
 ```
 
@@ -154,7 +168,7 @@ import { listChanges, getDiff } from "./services/git-diff.js";
 import { resolvePath } from "./services/workspace-fs.js";
 import { createShellSession } from "./services/console.js";
 import { RPC_CHANNEL, WS_PATH } from "./constants.js";
-import { ok, fail, failFrom, assertCwdMatchesSession } from "./rpc.js";
+import { ok, fail, failFrom, checkCwdGuard } from "./rpc.js";
 ```
 
 改动 2 —— 删除原文件内 `const RPC_CHANNEL` / `const WS_PATH` 两行（常量已收敛到 constants.js）。
@@ -170,12 +184,24 @@ export const inject = ["connection", "webServer", "fs", "subprocess", "sessions"
 ```js
     // ── 1) 一元 RPC：client -> host 调用三服务（契约见 lib/rpc.js）──────────
     // handler 签名 = (endpoint, payload, signal)；返回值必须是 ok/fail 信封。
-    // cwd 校验：payload.sessionId 存在时，cwd 必须等于会话 header.cwd。
+    // cwd 校验（fail-closed，2026-08-15 用户裁定）：带 cwd 的 op 必须携带 UI 会话 sessionId；
+    // 缺失→bad-request、未知→session-not-found、不一致→session-conflict（枚举内 code）。
+    const cwdGuardResult = (payload) => {
+      const session = payload?.sessionId ? ctx.sessions?.get(payload.sessionId) : undefined;
+      return checkCwdGuard(session, payload);
+    };
     const guardCwd = (payload) => {
-      if (payload?.sessionId) {
-        const session = ctx.sessions?.get(payload.sessionId);
-        if (session) assertCwdMatchesSession(session.header?.cwd, payload.cwd);
+      const g = cwdGuardResult(payload);
+      if (g.status === "missing-session-id") return fail("bad-request", "sessionId 必须提供", { issues: [] });
+      if (g.status === "session-not-found") return fail("session-not-found", "会话不存在", { sessionId: payload.sessionId });
+      if (g.status === "conflict") {
+        return fail("session-conflict", `cwd 与当前会话工作区不一致: ${g.requestedCwd} ≠ ${g.existingCwd}`, {
+          sessionId: payload.sessionId,
+          requestedCwd: g.requestedCwd,
+          existingCwd: g.existingCwd,
+        });
       }
+      return null;
     };
     ctx.connection.rpc.handle(
       RPC_CHANNEL,
@@ -183,16 +209,19 @@ export const inject = ["connection", "webServer", "fs", "subprocess", "sessions"
         try {
           switch (endpoint) {
             case "git.listChanges": {
-              guardCwd(payload);
+              const guardError = guardCwd(payload);
+              if (guardError) return guardError;
               return ok(await listChanges(payload.cwd));
             }
             case "git.getDiff": {
-              guardCwd(payload);
+              const guardError = guardCwd(payload);
+              if (guardError) return guardError;
               return ok(await getDiff(payload.cwd, payload.file, { untracked: payload.untracked }));
             }
             case "fs.listDir": {
               // 优先 ctx.fs：resolve 防越界 + listDir 一层懒加载；隐藏全部 dot 条目
-              guardCwd(payload);
+              const guardError = guardCwd(payload);
+              if (guardError) return guardError;
               const root = await ctx.fs.resolve(payload.cwd);
               const target = payload.relPath ? await ctx.fs.resolve(payload.relPath, { cwd: root }) : root;
               const entries = await ctx.fs.listDir(target);
@@ -203,11 +232,13 @@ export const inject = ["connection", "webServer", "fs", "subprocess", "sessions"
               });
             }
             case "fs.resolvePath": {
-              guardCwd(payload);
+              const guardError = guardCwd(payload);
+              if (guardError) return guardError;
               return ok({ absolute: resolvePath(payload.cwd, payload.relPath).absolute });
             }
             case "console.create": {
-              guardCwd(payload);
+              const guardError = guardCwd(payload);
+              if (guardError) return guardError;
               const s = await createShellSession(
                 { spawnTerminal: (opts) => ctx.subprocess.spawnTerminal(opts) },
                 { cwd: payload.cwd },
@@ -217,13 +248,24 @@ export const inject = ["connection", "webServer", "fs", "subprocess", "sessions"
             }
             case "console.write": {
               const s = sessions.get(payload.sessionId);
-              if (!s) return fail("session-not-found", "会话不存在", { sessionId: payload.sessionId });
+              if (!s) {
+                // 仅当 sessionId 为 string 时才可带 {sessionId} details（否则 client 严格 schema 解析失败）
+                if (typeof payload.sessionId === "string") {
+                  return fail("session-not-found", "会话不存在", { sessionId: payload.sessionId });
+                }
+                return fail("bad-request", "sessionId 必须提供", { issues: [] });
+              }
               s.write(payload.data);
               return ok(true);
             }
             case "console.kill": {
               const s = sessions.get(payload.sessionId);
-              if (!s) return fail("session-not-found", "会话不存在", { sessionId: payload.sessionId });
+              if (!s) {
+                if (typeof payload.sessionId === "string") {
+                  return fail("session-not-found", "会话不存在", { sessionId: payload.sessionId });
+                }
+                return fail("bad-request", "sessionId 必须提供", { issues: [] });
+              }
               s.kill();
               sessions.delete(payload.sessionId);
               return ok(true);
