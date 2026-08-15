@@ -397,15 +397,15 @@ git commit -m "feat: commit detail window (files list + per-file diff via shared
 
 ## 里程碑验收清单（M3d）
 
-- [ ] `node --test` 全绿（79 用例）。
-- [ ] host 端点 git.show/git.showFile 单测（5，含 target/file 校验）。
-- [ ] client.js 重建提交；静态验证标记齐全。
-- [ ] **host 改动需重启 harness**；重启后 curl 探测 `git.show`。
+- [x] `node --test` 全绿（**79 用例**：74 + git-history 5）。
+- [x] host 端点 git.show/git.showFile 单测（5，含 target/file 校验；--format= 与校验顺序两处 brief 修正经审查验证）。
+- [x] client.js 重建提交（68KB）；静态验证标记齐全（data-wt-commit-file/detail/diff-line）。
+- [ ] **host 改动需重启 harness**；重启后 curl 探测 `git.show`（controller 下一步执行）。
 - [ ] GUI 手动验收：
   - [ ] 点击历史行 → 提交详情浮窗：文件列表（状态徽章）。
   - [ ] 点击文件 → 窗口内显示该文件 diff（行号 + 红删绿加 + hunk）。
   - [ ] 浮窗可拖拽、✕/Esc 关闭；切换提交/文件正确重置。
-- [ ] 推送至 GitHub 私有仓库 main。
+- [x] 推送至 GitHub 私有仓库 main。
 
 ## 后续（非 M3d 范围）
 
