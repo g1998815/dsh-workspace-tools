@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { logCommits, commitAll, resetTo, currentBranch } from "../lib/services/git-history.js";
+import { logCommits, commitAll, resetTo, currentBranch, showCommitFiles, showCommitFile } from "../lib/services/git-history.js";
 
 function makeRepo() {
   const dir = mkdtempSync(join(tmpdir(), "dshwt-gh-"));
@@ -119,5 +119,69 @@ test("logCommits: 零提交仓库返回空历史（unborn HEAD）", async () => 
     assert.deepEqual(commits, []);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("showCommitFiles: 提交的文件列表（M/A，rename 取新路径）", async () => {
+  const repo = makeRepo();
+  try {
+    writeFileSync(join(repo.dir, "b.txt"), "hi\n");
+    repo.git(["add", "b.txt"]);
+    repo.git(["commit", "-qm", "add b"]);
+    writeFileSync(join(repo.dir, "a.txt"), "one\nchanged\n");
+    repo.git(["add", "a.txt"]);
+    repo.git(["commit", "-qm", "modify a"]);
+    const { commits } = await logCommits(repo.dir);
+    const { files } = await showCommitFiles(repo.dir, commits[0].hash); // modify a
+    const byPath = Object.fromEntries(files.map((f) => [f.path, f.status]));
+    assert.equal(byPath["a.txt"], "M");
+    const { files: files2 } = await showCommitFiles(repo.dir, commits[1].hash); // add b
+    assert.deepEqual(files2.map((f) => [f.status, f.path]), [["A", "b.txt"]]);
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test("showCommitFiles: 非法 target 拒绝", async () => {
+  const repo = makeRepo();
+  try {
+    await assert.rejects(showCommitFiles(repo.dir, "abc;rm"), (e) => e.code === "invalid-target");
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test("showCommitFile: 返回该文件 unified diff", async () => {
+  const repo = makeRepo();
+  try {
+    writeFileSync(join(repo.dir, "a.txt"), "one\nchanged\n");
+    repo.git(["add", "a.txt"]);
+    repo.git(["commit", "-qm", "modify a"]);
+    const { commits } = await logCommits(repo.dir);
+    const { diff } = await showCommitFile(repo.dir, commits[0].hash, "a.txt");
+    assert.match(diff, /^diff --git/);
+    assert.match(diff, /\+changed/);
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test("showCommitFile: 非法 file 拒绝（绝对/越界/空）", async () => {
+  const repo = makeRepo();
+  try {
+    await assert.rejects(showCommitFile(repo.dir, "HEAD", "/etc/passwd"), (e) => e.code === "invalid-file");
+    await assert.rejects(showCommitFile(repo.dir, "HEAD", "../x"), (e) => e.code === "invalid-file");
+    await assert.rejects(showCommitFile(repo.dir, "HEAD", ""), (e) => e.code === "invalid-file");
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test("showCommitFile: 非法 target 拒绝", async () => {
+  const repo = makeRepo();
+  try {
+    await assert.rejects(showCommitFile(repo.dir, "zzz", "a.txt"), (e) => e.code === "invalid-target");
+  } finally {
+    repo.cleanup();
   }
 });
