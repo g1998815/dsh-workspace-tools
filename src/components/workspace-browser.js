@@ -2,6 +2,7 @@ import { jsx } from "react/jsx-runtime";
 import { useState } from "react";
 import { SessionList } from "./session-list.js";
 import { FileTree } from "./file-tree.js";
+import { Changes } from "./changes.js";
 
 // 页签顺序（2026-08-15 用户定）：文件 → 变更 → 会话（会话放最后）
 const TABS = [
@@ -103,7 +104,7 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
                   ? jsx(SessionList, { useSessions, openSession })
                   : tab === "files"
                     ? jsx(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer })
-                    : jsx("div", { "data-wt-changes-placeholder": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "变更列表将在 M3 提供" }),
+                    : jsx(Changes, { cwd, sessionId: current, rpc }),
             }),
           ],
         }),

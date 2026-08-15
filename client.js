@@ -32,8 +32,8 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/components/workspace-browser.js
-var import_jsx_runtime3 = require("react/jsx-runtime");
-var import_react2 = require("react");
+var import_jsx_runtime4 = require("react/jsx-runtime");
+var import_react3 = require("react");
 
 // src/components/session-list.js
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -350,6 +350,294 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
   });
 }
 
+// src/components/changes.js
+var import_jsx_runtime3 = require("react/jsx-runtime");
+var import_react2 = require("react");
+
+// src/lib/git-changes.js
+function normalizeChanges(raw) {
+  return (raw ?? []).map((c) => {
+    const path = c.path ?? "";
+    const idx = path.lastIndexOf("/");
+    return {
+      status: c.status,
+      untracked: !!c.untracked,
+      path,
+      dir: idx === -1 ? "" : path.slice(0, idx),
+      base: idx === -1 ? path : path.slice(idx + 1)
+    };
+  });
+}
+function statusLabel(s) {
+  switch (s) {
+    case "??":
+      return "\u672A\u8DDF\u8E2A";
+    case "M":
+      return "\u4FEE\u6539";
+    case "D":
+      return "\u5220\u9664";
+    case "A":
+      return "\u65B0\u589E";
+    case "R":
+      return "\u91CD\u547D\u540D";
+    default:
+      return s;
+  }
+}
+function groupByDir(changes) {
+  const groups = [];
+  const byDir = /* @__PURE__ */ new Map();
+  for (const c of changes) {
+    if (!byDir.has(c.dir)) {
+      byDir.set(c.dir, []);
+      groups.push({ dir: c.dir, items: byDir.get(c.dir) });
+    }
+    byDir.get(c.dir).push(c);
+  }
+  return groups;
+}
+function visibleRows2(groups, collapsed) {
+  const rows = [];
+  for (const g of groups) {
+    rows.push({ kind: "dir", dir: g.dir, count: g.items.length });
+    if (collapsed.has(g.dir)) continue;
+    for (const it of g.items) {
+      const { dir, ...rest } = it;
+      rows.push({ kind: "file", ...rest });
+    }
+  }
+  return rows;
+}
+function parseDiff(text) {
+  if (!text) return [];
+  const lines = [];
+  let oldLine = null;
+  let newLine = null;
+  for (const line of text.split("\n")) {
+    if (line.startsWith("@@")) {
+      const m = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+      oldLine = m ? Number(m[1]) : null;
+      newLine = m ? Number(m[2]) : null;
+      lines.push({ kind: "hunk", text: line, oldLine: null, newLine: null });
+    } else if (line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff ") || line.startsWith("index ")) {
+      lines.push({ kind: "meta", text: line, oldLine: null, newLine: null });
+    } else if (line.startsWith("+")) {
+      lines.push({ kind: "add", text: line, oldLine: null, newLine });
+      if (newLine !== null) newLine += 1;
+    } else if (line.startsWith("-")) {
+      lines.push({ kind: "del", text: line, oldLine, newLine: null });
+      if (oldLine !== null) oldLine += 1;
+    } else if (line.startsWith(" ")) {
+      lines.push({ kind: "ctx", text: line, oldLine, newLine });
+      if (oldLine !== null) oldLine += 1;
+      if (newLine !== null) newLine += 1;
+    } else if (line === "") {
+    } else {
+      lines.push({ kind: "ctx", text: line, oldLine: null, newLine: null });
+    }
+  }
+  return lines;
+}
+
+// src/components/changes.js
+var STATUS_COLOR = {
+  M: "#e6b450",
+  "??": "#9a9a9a",
+  D: "#e06c75",
+  A: "#7ec699",
+  R: "#61afef"
+};
+function Changes({ cwd, sessionId, rpc }) {
+  const [groups, setGroups] = (0, import_react2.useState)([]);
+  const [status, setStatus] = (0, import_react2.useState)("loading");
+  const [error, setError] = (0, import_react2.useState)(null);
+  const [collapsed, setCollapsed] = (0, import_react2.useState)(() => /* @__PURE__ */ new Set());
+  const [selected, setSelected] = (0, import_react2.useState)(null);
+  const [diffLines, setDiffLines] = (0, import_react2.useState)(null);
+  const [diffError, setDiffError] = (0, import_react2.useState)(null);
+  const load = (0, import_react2.useCallback)(() => {
+    if (!cwd) {
+      setGroups([]);
+      setStatus("ready");
+      return;
+    }
+    setStatus("loading");
+    callRpc(rpc, "git.listChanges", { cwd, sessionId }).then((value) => {
+      setGroups(groupByDir(normalizeChanges(value.changes)));
+      setStatus("ready");
+      setError(null);
+    }).catch((err) => {
+      setStatus("error");
+      setError(String(err?.message ?? err));
+    });
+  }, [cwd, rpc, sessionId]);
+  (0, import_react2.useEffect)(() => {
+    setSelected(null);
+    setDiffLines(null);
+    setDiffError(null);
+    setCollapsed(/* @__PURE__ */ new Set());
+    load();
+  }, [load]);
+  const openFile = (0, import_react2.useCallback)(
+    (c) => {
+      setSelected({ path: c.path, untracked: c.untracked });
+      setDiffLines(null);
+      setDiffError(null);
+      callRpc(rpc, "git.getDiff", { cwd, file: c.path, untracked: c.untracked, sessionId }).then((value) => setDiffLines(parseDiff(value.diff))).catch((err) => setDiffError(String(err?.message ?? err)));
+    },
+    [cwd, rpc, sessionId]
+  );
+  const toggleDir = (0, import_react2.useCallback)((dir) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(dir)) next.delete(dir);
+      else next.add(dir);
+      return next;
+    });
+  }, []);
+  const rows = (0, import_react2.useMemo)(() => visibleRows2(groups, collapsed), [groups, collapsed]);
+  let list;
+  if (status === "loading") {
+    list = (0, import_jsx_runtime3.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
+  } else if (status === "error") {
+    list = (0, import_jsx_runtime3.jsx)("div", { "data-wt-error": true, style: { padding: 12, color: "#e06c75" }, children: error });
+  } else if (rows.length === 0) {
+    list = (0, import_jsx_runtime3.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u6CA1\u6709\u53D8\u66F4" });
+  } else {
+    list = (0, import_jsx_runtime3.jsx)("div", {
+      "data-wt-changes-list": true,
+      children: rows.map(
+        (row) => row.kind === "dir" ? (0, import_jsx_runtime3.jsx)("div", {
+          key: `dir-${row.dir}`,
+          "data-wt-changes-dir": true,
+          onClick: () => toggleDir(row.dir),
+          style: {
+            padding: "4px 10px",
+            fontWeight: 600,
+            cursor: "pointer",
+            color: "var(--dsw-alias-text-secondary, #999)",
+            display: "flex",
+            gap: 6,
+            alignItems: "center"
+          },
+          children: [
+            (0, import_jsx_runtime3.jsx)("span", { children: collapsed.has(row.dir) ? "\u25B8" : "\u25BE" }),
+            (0, import_jsx_runtime3.jsx)("span", { children: row.dir === "" ? "\uFF08\u6839\u76EE\u5F55\uFF09" : row.dir }),
+            (0, import_jsx_runtime3.jsx)("span", { style: { opacity: 0.6 }, children: `${row.count}` })
+          ]
+        }) : (0, import_jsx_runtime3.jsx)("div", {
+          key: `file-${row.path}`,
+          role: "button",
+          "data-wt-changes-file": true,
+          "data-selected": selected?.path === row.path || void 0,
+          onClick: () => openFile(row),
+          style: {
+            padding: "3px 10px",
+            paddingLeft: 26,
+            cursor: "pointer",
+            display: "flex",
+            gap: 6,
+            alignItems: "center",
+            background: selected?.path === row.path ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
+          },
+          children: [
+            (0, import_jsx_runtime3.jsx)("span", {
+              style: {
+                width: 20,
+                textAlign: "center",
+                fontSize: "11px",
+                fontWeight: 700,
+                color: STATUS_COLOR[row.status] ?? "#ccc",
+                border: `1px solid ${STATUS_COLOR[row.status] ?? "#ccc"}`,
+                borderRadius: 3,
+                flexShrink: 0
+              },
+              children: row.status === "??" ? "?" : row.status
+            }),
+            (0, import_jsx_runtime3.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: row.base })
+          ]
+        })
+      )
+    });
+  }
+  let diffPanel = null;
+  if (selected) {
+    if (diffError) {
+      diffPanel = (0, import_jsx_runtime3.jsx)("div", { "data-wt-diff-error": true, style: { padding: 12, color: "#e06c75", borderTop: "1px solid var(--dsw-alias-border-l2, #333)" }, children: diffError });
+    } else if (!diffLines) {
+      diffPanel = (0, import_jsx_runtime3.jsx)("div", { "data-wt-diff-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)", borderTop: "1px solid var(--dsw-alias-border-l2, #333)" }, children: "\u52A0\u8F7D diff\u2026" });
+    } else {
+      diffPanel = (0, import_jsx_runtime3.jsx)("div", {
+        "data-wt-diff": true,
+        style: {
+          borderTop: "1px solid var(--dsw-alias-border-l2, #333)",
+          maxHeight: "45%",
+          overflow: "auto",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+          fontSize: "11px",
+          flexShrink: 0
+        },
+        children: [
+          (0, import_jsx_runtime3.jsx)("div", {
+            "data-wt-diff-head": true,
+            style: { padding: "6px 10px", color: "var(--dsw-alias-text-secondary, #999)", background: "var(--dsw-alias-bg-float, #1f1f1f)" },
+            children: `${selected.path} \xB7 ${statusLabel(selected.untracked ? "??" : "M")}`
+          }),
+          (0, import_jsx_runtime3.jsx)("div", {
+            children: diffLines.map((l, i) => {
+              let bg = "none";
+              let color = "var(--dsw-alias-text-primary, #ddd)";
+              if (l.kind === "add") {
+                bg = "rgba(126,198,153,0.15)";
+                color = "#7ec699";
+              } else if (l.kind === "del") {
+                bg = "rgba(224,108,117,0.15)";
+                color = "#e06c75";
+              } else if (l.kind === "hunk") {
+                bg = "rgba(97,175,239,0.12)";
+                color = "#61afef";
+              } else if (l.kind === "meta") {
+                color = "var(--dsw-alias-text-secondary, #999)";
+              }
+              const oldCell = l.oldLine !== null ? String(l.oldLine) : " ";
+              const newCell = l.newLine !== null ? String(l.newLine) : " ";
+              return (0, import_jsx_runtime3.jsx)("div", {
+                key: i,
+                "data-wt-diff-line": true,
+                "data-kind": l.kind,
+                style: { display: "flex", background: bg, color, padding: "0 6px", whiteSpace: "pre" },
+                children: [
+                  (0, import_jsx_runtime3.jsx)("span", { style: { width: 42, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 4 }, children: oldCell }),
+                  (0, import_jsx_runtime3.jsx)("span", { style: { width: 42, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 6 }, children: newCell }),
+                  (0, import_jsx_runtime3.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: l.text })
+                ]
+              });
+            })
+          })
+        ]
+      });
+    }
+  }
+  return (0, import_jsx_runtime3.jsx)("div", {
+    "data-wt-changes": true,
+    style: { display: "flex", flexDirection: "column", height: "100%", minHeight: 0 },
+    children: [
+      (0, import_jsx_runtime3.jsx)("div", {
+        style: { display: "flex", justifyContent: "flex-end", padding: "2px 6px", flexShrink: 0 },
+        children: (0, import_jsx_runtime3.jsx)("button", {
+          type: "button",
+          "data-wt-refresh": true,
+          onClick: load,
+          style: { background: "none", border: "none", cursor: "pointer", color: "var(--dsw-alias-text-secondary, #999)", fontSize: "12px", padding: "2px 8px" },
+          children: "\u21BB \u5237\u65B0"
+        })
+      }),
+      (0, import_jsx_runtime3.jsx)("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: list }),
+      diffPanel
+    ]
+  });
+}
+
 // src/components/workspace-browser.js
 var TABS = [
   { id: "files", label: "\u6587\u4EF6" },
@@ -357,11 +645,11 @@ var TABS = [
   { id: "sessions", label: "\u4F1A\u8BDD" }
 ];
 function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
-  const [open, setOpen] = (0, import_react2.useState)(true);
-  const [tab, setTab] = (0, import_react2.useState)("files");
+  const [open, setOpen] = (0, import_react3.useState)(true);
+  const [tab, setTab] = (0, import_react3.useState)("files");
   const current = useSessions((s) => s.current);
   const cwd = useSessions((s) => s.current ? s.byId[s.current]?.cwd : void 0);
-  return (0, import_jsx_runtime3.jsx)("div", {
+  return (0, import_jsx_runtime4.jsx)("div", {
     "data-wt-rail": true,
     style: {
       position: "absolute",
@@ -375,7 +663,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
     },
     children: [
       // 收展按钮（面板左侧窄条）
-      (0, import_jsx_runtime3.jsx)("button", {
+      (0, import_jsx_runtime4.jsx)("button", {
         type: "button",
         "data-wt-toggle": true,
         "aria-label": open ? "\u6536\u8D77\u5DE5\u5177\u4FA7\u8FB9\u680F" : "\u5C55\u5F00\u5DE5\u5177\u4FA7\u8FB9\u680F",
@@ -396,7 +684,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
         },
         children: open ? "\u25B8" : "\u25C2"
       }),
-      open && (0, import_jsx_runtime3.jsx)("div", {
+      open && (0, import_jsx_runtime4.jsx)("div", {
         "data-wt-panel": true,
         style: {
           width: 300,
@@ -408,7 +696,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
           minHeight: 0
         },
         children: [
-          (0, import_jsx_runtime3.jsx)("div", {
+          (0, import_jsx_runtime4.jsx)("div", {
             "data-wt-tabs": true,
             style: {
               display: "flex",
@@ -416,7 +704,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
               flexShrink: 0
             },
             children: TABS.map(
-              (t) => (0, import_jsx_runtime3.jsx)("button", {
+              (t) => (0, import_jsx_runtime4.jsx)("button", {
                 key: t.id,
                 type: "button",
                 onClick: () => setTab(t.id),
@@ -435,10 +723,10 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
               })
             )
           }),
-          (0, import_jsx_runtime3.jsx)("div", {
+          (0, import_jsx_runtime4.jsx)("div", {
             "data-wt-tabpanel": true,
             style: { flex: 1, minHeight: 0, overflow: "auto", padding: "4px 0" },
-            children: tab === "sessions" ? (0, import_jsx_runtime3.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime3.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : (0, import_jsx_runtime3.jsx)("div", { "data-wt-changes-placeholder": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u53D8\u66F4\u5217\u8868\u5C06\u5728 M3 \u63D0\u4F9B" })
+            children: tab === "sessions" ? (0, import_jsx_runtime4.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime4.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : (0, import_jsx_runtime4.jsx)(Changes, { cwd, sessionId: current, rpc })
           })
         ]
       })
