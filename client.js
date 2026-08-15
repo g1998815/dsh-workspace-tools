@@ -32,8 +32,8 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/components/workspace-browser.js
-var import_jsx_runtime4 = require("react/jsx-runtime");
-var import_react3 = require("react");
+var import_jsx_runtime5 = require("react/jsx-runtime");
+var import_react4 = require("react");
 
 // src/components/session-list.js
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -351,8 +351,8 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
 }
 
 // src/components/changes.js
-var import_jsx_runtime3 = require("react/jsx-runtime");
-var import_react2 = require("react");
+var import_jsx_runtime4 = require("react/jsx-runtime");
+var import_react3 = require("react");
 
 // src/lib/git-changes.js
 function normalizeChanges(raw) {
@@ -439,6 +439,213 @@ function parseDiff(text) {
   return lines;
 }
 
+// src/components/diff-window.js
+var import_jsx_runtime3 = require("react/jsx-runtime");
+var import_react2 = require("react");
+var WINDOW_W = 720;
+function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
+  const [pos, setPos] = (0, import_react2.useState)(() => {
+    const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+    return { x: Math.max(8, vw - WINDOW_W - 24), y: 64 };
+  });
+  const [query, setQuery] = (0, import_react2.useState)("");
+  const [matchIdx, setMatchIdx] = (0, import_react2.useState)(0);
+  const bodyRef = (0, import_react2.useRef)(null);
+  const dragRef = (0, import_react2.useRef)(null);
+  const matches = (0, import_react2.useMemo)(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || !diffLines) return [];
+    const out = [];
+    diffLines.forEach((l, i) => {
+      if (l.text.toLowerCase().includes(q)) out.push(i);
+    });
+    return out;
+  }, [query, diffLines]);
+  (0, import_react2.useEffect)(() => {
+    setQuery("");
+    setMatchIdx(0);
+  }, [file]);
+  (0, import_react2.useEffect)(() => {
+    if (!bodyRef.current || matches.length === 0) return;
+    const idx = matches[Math.min(matchIdx, matches.length - 1)];
+    const el = bodyRef.current.querySelector(`[data-line="${idx}"]`);
+    el?.scrollIntoView({ block: "center" });
+  }, [matchIdx, matches]);
+  const onTitleDown = (0, import_react2.useCallback)(
+    (e) => {
+      if (e.target.closest("input,button")) return;
+      dragRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
+      const move = (ev) => {
+        setPos({ x: Math.max(0, ev.clientX - dragRef.current.dx), y: Math.max(0, ev.clientY - dragRef.current.dy) });
+      };
+      const up = () => {
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    },
+    [pos]
+  );
+  const nextMatch = (0, import_react2.useCallback)(() => {
+    if (matches.length) setMatchIdx((i) => (i + 1) % matches.length);
+  }, [matches.length]);
+  const prevMatch = (0, import_react2.useCallback)(() => {
+    if (matches.length) setMatchIdx((i) => (i - 1 + matches.length) % matches.length);
+  }, [matches.length]);
+  let body;
+  if (diffError) {
+    body = (0, import_jsx_runtime3.jsx)("div", { "data-wt-diff-error": true, style: { padding: 16, color: "#e06c75" }, children: diffError });
+  } else if (!diffLines) {
+    body = (0, import_jsx_runtime3.jsx)("div", { "data-wt-diff-loading": true, style: { padding: 16, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D diff\u2026" });
+  } else {
+    body = (0, import_jsx_runtime3.jsx)("div", {
+      ref: bodyRef,
+      "data-wt-diff": true,
+      style: { flex: 1, overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "11px", paddingBottom: 8 },
+      children: diffLines.map((l, i) => {
+        let bg = "none";
+        let color = "var(--dsw-alias-text-primary, #ddd)";
+        if (l.kind === "add") {
+          bg = "rgba(126,198,153,0.15)";
+          color = "#7ec699";
+        } else if (l.kind === "del") {
+          bg = "rgba(224,108,117,0.15)";
+          color = "#e06c75";
+        } else if (l.kind === "hunk") {
+          bg = "rgba(97,175,239,0.12)";
+          color = "#61afef";
+        } else if (l.kind === "meta") {
+          color = "var(--dsw-alias-text-secondary, #999)";
+        }
+        const isMatch = matches.includes(i);
+        if (isMatch) {
+          bg = "rgba(230,180,80,0.28)";
+          color = "#f0d59a";
+        }
+        const oldCell = l.oldLine !== null ? String(l.oldLine) : " ";
+        const newCell = l.newLine !== null ? String(l.newLine) : " ";
+        return (0, import_jsx_runtime3.jsx)("div", {
+          key: i,
+          "data-line": i,
+          "data-wt-diff-line": true,
+          "data-kind": l.kind,
+          "data-wt-match": isMatch || void 0,
+          style: { display: "flex", background: bg, color, padding: "0 8px", whiteSpace: "pre" },
+          children: [
+            (0, import_jsx_runtime3.jsx)("span", { style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 4 }, children: oldCell }),
+            (0, import_jsx_runtime3.jsx)("span", { style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 8 }, children: newCell }),
+            (0, import_jsx_runtime3.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: l.text })
+          ]
+        });
+      })
+    });
+  }
+  const hasQuery = query.trim() !== "";
+  return (0, import_jsx_runtime3.jsx)("div", {
+    "data-wt-diff-window": true,
+    style: {
+      position: "fixed",
+      left: pos.x,
+      top: pos.y,
+      width: WINDOW_W,
+      maxWidth: "94vw",
+      height: "66vh",
+      minHeight: 240,
+      display: "flex",
+      flexDirection: "column",
+      background: "var(--dsw-alias-bg-base, #1a1a1a)",
+      border: "1px solid var(--dsw-alias-border-l2, #333)",
+      borderRadius: 8,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+      zIndex: 100,
+      fontSize: 12,
+      overflow: "hidden"
+    },
+    children: [
+      // 标题栏（拖拽把手）
+      (0, import_jsx_runtime3.jsx)("div", {
+        "data-wt-diff-window-title": true,
+        onMouseDown: onTitleDown,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "6px 10px",
+          cursor: "move",
+          background: "var(--dsw-alias-bg-float, #1f1f1f)",
+          borderBottom: "1px solid var(--dsw-alias-border-l2, #333)",
+          flexShrink: 0,
+          userSelect: "none"
+        },
+        children: [
+          (0, import_jsx_runtime3.jsx)("span", { style: { fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, children: file }),
+          (0, import_jsx_runtime3.jsx)("span", {
+            style: {
+              fontSize: "10px",
+              padding: "1px 5px",
+              border: "1px solid #888",
+              borderRadius: 3,
+              color: "#aaa",
+              flexShrink: 0
+            },
+            children: statusLabel(untracked ? "??" : "M")
+          }),
+          (0, import_jsx_runtime3.jsx)("input", {
+            "data-wt-diff-search": true,
+            type: "text",
+            placeholder: "\u641C\u7D22\u2026",
+            value: query,
+            onChange: (e) => {
+              setQuery(e.target.value);
+              setMatchIdx(0);
+            },
+            onKeyDown: (e) => {
+              if (e.key === "Enter") e.shiftKey ? prevMatch() : nextMatch();
+              if (e.key === "Escape") onClose();
+            },
+            style: {
+              flex: 1,
+              minWidth: 60,
+              background: "var(--dsw-alias-bg-base, #141414)",
+              border: "1px solid var(--dsw-alias-border-l2, #333)",
+              borderRadius: 4,
+              color: "var(--dsw-alias-text-primary, #ddd)",
+              padding: "3px 8px",
+              fontSize: 12,
+              outline: "none"
+            }
+          }),
+          hasQuery && (0, import_jsx_runtime3.jsx)("span", { "data-wt-diff-matchcount": true, style: { color: "#e6b450", fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }, children: matches.length ? `${Math.min(matchIdx + 1, matches.length)}/${matches.length}` : "0/0" }),
+          hasQuery && (0, import_jsx_runtime3.jsx)("button", {
+            type: "button",
+            "data-wt-diff-prev": true,
+            onClick: prevMatch,
+            style: { background: "none", border: "1px solid var(--dsw-alias-border-l2, #444)", borderRadius: 4, color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", padding: "1px 7px", fontSize: 11, flexShrink: 0 },
+            children: "\u2191"
+          }),
+          hasQuery && (0, import_jsx_runtime3.jsx)("button", {
+            type: "button",
+            "data-wt-diff-next": true,
+            onClick: nextMatch,
+            style: { background: "none", border: "1px solid var(--dsw-alias-border-l2, #444)", borderRadius: 4, color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", padding: "1px 7px", fontSize: 11, flexShrink: 0 },
+            children: "\u2193"
+          }),
+          (0, import_jsx_runtime3.jsx)("button", {
+            type: "button",
+            "data-wt-diff-close": true,
+            onClick: onClose,
+            title: "\u5173\u95ED\uFF08Esc\uFF09",
+            style: { background: "none", border: "none", color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", fontSize: 14, padding: "0 4px", flexShrink: 0 },
+            children: "\u2715"
+          })
+        ]
+      }),
+      body
+    ]
+  });
+}
+
 // src/components/changes.js
 var STATUS_COLOR = {
   M: "#e6b450",
@@ -448,14 +655,14 @@ var STATUS_COLOR = {
   R: "#61afef"
 };
 function Changes({ cwd, sessionId, rpc }) {
-  const [groups, setGroups] = (0, import_react2.useState)([]);
-  const [status, setStatus] = (0, import_react2.useState)("loading");
-  const [error, setError] = (0, import_react2.useState)(null);
-  const [collapsed, setCollapsed] = (0, import_react2.useState)(() => /* @__PURE__ */ new Set());
-  const [selected, setSelected] = (0, import_react2.useState)(null);
-  const [diffLines, setDiffLines] = (0, import_react2.useState)(null);
-  const [diffError, setDiffError] = (0, import_react2.useState)(null);
-  const load = (0, import_react2.useCallback)(() => {
+  const [groups, setGroups] = (0, import_react3.useState)([]);
+  const [status, setStatus] = (0, import_react3.useState)("loading");
+  const [error, setError] = (0, import_react3.useState)(null);
+  const [collapsed, setCollapsed] = (0, import_react3.useState)(() => /* @__PURE__ */ new Set());
+  const [selected, setSelected] = (0, import_react3.useState)(null);
+  const [diffLines, setDiffLines] = (0, import_react3.useState)(null);
+  const [diffError, setDiffError] = (0, import_react3.useState)(null);
+  const load = (0, import_react3.useCallback)(() => {
     if (!cwd) {
       setGroups([]);
       setStatus("ready");
@@ -471,14 +678,14 @@ function Changes({ cwd, sessionId, rpc }) {
       setError(String(err?.message ?? err));
     });
   }, [cwd, rpc, sessionId]);
-  (0, import_react2.useEffect)(() => {
+  (0, import_react3.useEffect)(() => {
     setSelected(null);
     setDiffLines(null);
     setDiffError(null);
     setCollapsed(/* @__PURE__ */ new Set());
     load();
   }, [load]);
-  const openFile = (0, import_react2.useCallback)(
+  const openFile = (0, import_react3.useCallback)(
     (c) => {
       setSelected({ path: c.path, untracked: c.untracked });
       setDiffLines(null);
@@ -487,7 +694,7 @@ function Changes({ cwd, sessionId, rpc }) {
     },
     [cwd, rpc, sessionId]
   );
-  const toggleDir = (0, import_react2.useCallback)((dir) => {
+  const toggleDir = (0, import_react3.useCallback)((dir) => {
     setCollapsed((prev) => {
       const next = new Set(prev);
       if (next.has(dir)) next.delete(dir);
@@ -495,19 +702,19 @@ function Changes({ cwd, sessionId, rpc }) {
       return next;
     });
   }, []);
-  const rows = (0, import_react2.useMemo)(() => visibleRows2(groups, collapsed), [groups, collapsed]);
+  const rows = (0, import_react3.useMemo)(() => visibleRows2(groups, collapsed), [groups, collapsed]);
   let list;
   if (status === "loading") {
-    list = (0, import_jsx_runtime3.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
+    list = (0, import_jsx_runtime4.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
   } else if (status === "error") {
-    list = (0, import_jsx_runtime3.jsx)("div", { "data-wt-error": true, style: { padding: 12, color: "#e06c75" }, children: error });
+    list = (0, import_jsx_runtime4.jsx)("div", { "data-wt-error": true, style: { padding: 12, color: "#e06c75" }, children: error });
   } else if (rows.length === 0) {
-    list = (0, import_jsx_runtime3.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u6CA1\u6709\u53D8\u66F4" });
+    list = (0, import_jsx_runtime4.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u6CA1\u6709\u53D8\u66F4" });
   } else {
-    list = (0, import_jsx_runtime3.jsx)("div", {
+    list = (0, import_jsx_runtime4.jsx)("div", {
       "data-wt-changes-list": true,
       children: rows.map(
-        (row) => row.kind === "dir" ? (0, import_jsx_runtime3.jsx)("div", {
+        (row) => row.kind === "dir" ? (0, import_jsx_runtime4.jsx)("div", {
           key: `dir-${row.dir}`,
           "data-wt-changes-dir": true,
           onClick: () => toggleDir(row.dir),
@@ -521,11 +728,11 @@ function Changes({ cwd, sessionId, rpc }) {
             alignItems: "center"
           },
           children: [
-            (0, import_jsx_runtime3.jsx)("span", { children: collapsed.has(row.dir) ? "\u25B8" : "\u25BE" }),
-            (0, import_jsx_runtime3.jsx)("span", { children: row.dir === "" ? "\uFF08\u6839\u76EE\u5F55\uFF09" : row.dir }),
-            (0, import_jsx_runtime3.jsx)("span", { style: { opacity: 0.6 }, children: `${row.count}` })
+            (0, import_jsx_runtime4.jsx)("span", { children: collapsed.has(row.dir) ? "\u25B8" : "\u25BE" }),
+            (0, import_jsx_runtime4.jsx)("span", { children: row.dir === "" ? "\uFF08\u6839\u76EE\u5F55\uFF09" : row.dir }),
+            (0, import_jsx_runtime4.jsx)("span", { style: { opacity: 0.6 }, children: `${row.count}` })
           ]
-        }) : (0, import_jsx_runtime3.jsx)("div", {
+        }) : (0, import_jsx_runtime4.jsx)("div", {
           key: `file-${row.path}`,
           role: "button",
           "data-wt-changes-file": true,
@@ -541,7 +748,7 @@ function Changes({ cwd, sessionId, rpc }) {
             background: selected?.path === row.path ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
           },
           children: [
-            (0, import_jsx_runtime3.jsx)("span", {
+            (0, import_jsx_runtime4.jsx)("span", {
               style: {
                 width: 20,
                 textAlign: "center",
@@ -554,77 +761,33 @@ function Changes({ cwd, sessionId, rpc }) {
               },
               children: row.status === "??" ? "?" : row.status
             }),
-            (0, import_jsx_runtime3.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: row.base })
+            (0, import_jsx_runtime4.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: row.base })
           ]
         })
       )
     });
   }
-  let diffPanel = null;
+  let diffWindow = null;
   if (selected) {
-    if (diffError) {
-      diffPanel = (0, import_jsx_runtime3.jsx)("div", { "data-wt-diff-error": true, style: { padding: 12, color: "#e06c75", borderTop: "1px solid var(--dsw-alias-border-l2, #333)" }, children: diffError });
-    } else if (!diffLines) {
-      diffPanel = (0, import_jsx_runtime3.jsx)("div", { "data-wt-diff-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)", borderTop: "1px solid var(--dsw-alias-border-l2, #333)" }, children: "\u52A0\u8F7D diff\u2026" });
-    } else {
-      diffPanel = (0, import_jsx_runtime3.jsx)("div", {
-        "data-wt-diff": true,
-        style: {
-          borderTop: "1px solid var(--dsw-alias-border-l2, #333)",
-          maxHeight: "45%",
-          overflow: "auto",
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-          fontSize: "11px",
-          flexShrink: 0
-        },
-        children: [
-          (0, import_jsx_runtime3.jsx)("div", {
-            "data-wt-diff-head": true,
-            style: { padding: "6px 10px", color: "var(--dsw-alias-text-secondary, #999)", background: "var(--dsw-alias-bg-float, #1f1f1f)" },
-            children: `${selected.path} \xB7 ${statusLabel(selected.untracked ? "??" : "M")}`
-          }),
-          (0, import_jsx_runtime3.jsx)("div", {
-            children: diffLines.map((l, i) => {
-              let bg = "none";
-              let color = "var(--dsw-alias-text-primary, #ddd)";
-              if (l.kind === "add") {
-                bg = "rgba(126,198,153,0.15)";
-                color = "#7ec699";
-              } else if (l.kind === "del") {
-                bg = "rgba(224,108,117,0.15)";
-                color = "#e06c75";
-              } else if (l.kind === "hunk") {
-                bg = "rgba(97,175,239,0.12)";
-                color = "#61afef";
-              } else if (l.kind === "meta") {
-                color = "var(--dsw-alias-text-secondary, #999)";
-              }
-              const oldCell = l.oldLine !== null ? String(l.oldLine) : " ";
-              const newCell = l.newLine !== null ? String(l.newLine) : " ";
-              return (0, import_jsx_runtime3.jsx)("div", {
-                key: i,
-                "data-wt-diff-line": true,
-                "data-kind": l.kind,
-                style: { display: "flex", background: bg, color, padding: "0 6px", whiteSpace: "pre" },
-                children: [
-                  (0, import_jsx_runtime3.jsx)("span", { style: { width: 42, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 4 }, children: oldCell }),
-                  (0, import_jsx_runtime3.jsx)("span", { style: { width: 42, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 6 }, children: newCell }),
-                  (0, import_jsx_runtime3.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: l.text })
-                ]
-              });
-            })
-          })
-        ]
-      });
-    }
+    diffWindow = (0, import_jsx_runtime4.jsx)(DiffWindow, {
+      file: selected.path,
+      untracked: selected.untracked,
+      diffLines,
+      diffError,
+      onClose: () => {
+        setSelected(null);
+        setDiffLines(null);
+        setDiffError(null);
+      }
+    });
   }
-  return (0, import_jsx_runtime3.jsx)("div", {
+  return (0, import_jsx_runtime4.jsx)("div", {
     "data-wt-changes": true,
     style: { display: "flex", flexDirection: "column", height: "100%", minHeight: 0 },
     children: [
-      (0, import_jsx_runtime3.jsx)("div", {
+      (0, import_jsx_runtime4.jsx)("div", {
         style: { display: "flex", justifyContent: "flex-end", padding: "2px 6px", flexShrink: 0 },
-        children: (0, import_jsx_runtime3.jsx)("button", {
+        children: (0, import_jsx_runtime4.jsx)("button", {
           type: "button",
           "data-wt-refresh": true,
           onClick: load,
@@ -632,8 +795,8 @@ function Changes({ cwd, sessionId, rpc }) {
           children: "\u21BB \u5237\u65B0"
         })
       }),
-      (0, import_jsx_runtime3.jsx)("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: list }),
-      diffPanel
+      (0, import_jsx_runtime4.jsx)("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: list }),
+      diffWindow
     ]
   });
 }
@@ -645,11 +808,11 @@ var TABS = [
   { id: "sessions", label: "\u4F1A\u8BDD" }
 ];
 function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
-  const [open, setOpen] = (0, import_react3.useState)(true);
-  const [tab, setTab] = (0, import_react3.useState)("files");
+  const [open, setOpen] = (0, import_react4.useState)(true);
+  const [tab, setTab] = (0, import_react4.useState)("files");
   const current = useSessions((s) => s.current);
   const cwd = useSessions((s) => s.current ? s.byId[s.current]?.cwd : void 0);
-  return (0, import_jsx_runtime4.jsx)("div", {
+  return (0, import_jsx_runtime5.jsx)("div", {
     "data-wt-rail": true,
     style: {
       position: "absolute",
@@ -663,7 +826,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
     },
     children: [
       // 收展按钮（面板左侧窄条）
-      (0, import_jsx_runtime4.jsx)("button", {
+      (0, import_jsx_runtime5.jsx)("button", {
         type: "button",
         "data-wt-toggle": true,
         "aria-label": open ? "\u6536\u8D77\u5DE5\u5177\u4FA7\u8FB9\u680F" : "\u5C55\u5F00\u5DE5\u5177\u4FA7\u8FB9\u680F",
@@ -684,7 +847,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
         },
         children: open ? "\u25B8" : "\u25C2"
       }),
-      open && (0, import_jsx_runtime4.jsx)("div", {
+      open && (0, import_jsx_runtime5.jsx)("div", {
         "data-wt-panel": true,
         style: {
           width: 300,
@@ -696,7 +859,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
           minHeight: 0
         },
         children: [
-          (0, import_jsx_runtime4.jsx)("div", {
+          (0, import_jsx_runtime5.jsx)("div", {
             "data-wt-tabs": true,
             style: {
               display: "flex",
@@ -704,7 +867,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
               flexShrink: 0
             },
             children: TABS.map(
-              (t) => (0, import_jsx_runtime4.jsx)("button", {
+              (t) => (0, import_jsx_runtime5.jsx)("button", {
                 key: t.id,
                 type: "button",
                 onClick: () => setTab(t.id),
@@ -723,10 +886,10 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
               })
             )
           }),
-          (0, import_jsx_runtime4.jsx)("div", {
+          (0, import_jsx_runtime5.jsx)("div", {
             "data-wt-tabpanel": true,
             style: { flex: 1, minHeight: 0, overflow: "auto", padding: "4px 0" },
-            children: tab === "sessions" ? (0, import_jsx_runtime4.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime4.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : (0, import_jsx_runtime4.jsx)(Changes, { cwd, sessionId: current, rpc })
+            children: tab === "sessions" ? (0, import_jsx_runtime5.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime5.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : (0, import_jsx_runtime5.jsx)(Changes, { cwd, sessionId: current, rpc })
           })
         ]
       })

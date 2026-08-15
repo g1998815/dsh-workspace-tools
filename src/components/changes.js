@@ -2,7 +2,8 @@
 import { jsx } from "react/jsx-runtime";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { callRpc } from "../lib/rpc.js";
-import { normalizeChanges, groupByDir, visibleRows, parseDiff, statusLabel } from "../lib/git-changes.js";
+import { normalizeChanges, groupByDir, visibleRows, parseDiff } from "../lib/git-changes.js";
+import { DiffWindow } from "./diff-window.js";
 
 const STATUS_COLOR = {
   M: "#e6b450",
@@ -139,55 +140,19 @@ export function Changes({ cwd, sessionId, rpc }) {
     });
   }
 
-  let diffPanel = null;
+  let diffWindow = null;
   if (selected) {
-    if (diffError) {
-      diffPanel = jsx("div", { "data-wt-diff-error": true, style: { padding: 12, color: "#e06c75", borderTop: "1px solid var(--dsw-alias-border-l2, #333)" }, children: diffError });
-    } else if (!diffLines) {
-      diffPanel = jsx("div", { "data-wt-diff-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)", borderTop: "1px solid var(--dsw-alias-border-l2, #333)" }, children: "加载 diff…" });
-    } else {
-      diffPanel = jsx("div", {
-        "data-wt-diff": true,
-        style: {
-          borderTop: "1px solid var(--dsw-alias-border-l2, #333)",
-          maxHeight: "45%",
-          overflow: "auto",
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-          fontSize: "11px",
-          flexShrink: 0,
-        },
-        children: [
-          jsx("div", {
-            "data-wt-diff-head": true,
-            style: { padding: "6px 10px", color: "var(--dsw-alias-text-secondary, #999)", background: "var(--dsw-alias-bg-float, #1f1f1f)" },
-            children: `${selected.path} · ${statusLabel(selected.untracked ? "??" : "M")}`,
-          }),
-          jsx("div", {
-            children: diffLines.map((l, i) => {
-              let bg = "none";
-              let color = "var(--dsw-alias-text-primary, #ddd)";
-              if (l.kind === "add") { bg = "rgba(126,198,153,0.15)"; color = "#7ec699"; }
-              else if (l.kind === "del") { bg = "rgba(224,108,117,0.15)"; color = "#e06c75"; }
-              else if (l.kind === "hunk") { bg = "rgba(97,175,239,0.12)"; color = "#61afef"; }
-              else if (l.kind === "meta") { color = "var(--dsw-alias-text-secondary, #999)"; }
-              const oldCell = l.oldLine !== null ? String(l.oldLine) : " ";
-              const newCell = l.newLine !== null ? String(l.newLine) : " ";
-              return jsx("div", {
-                key: i,
-                "data-wt-diff-line": true,
-                "data-kind": l.kind,
-                style: { display: "flex", background: bg, color, padding: "0 6px", whiteSpace: "pre" },
-                children: [
-                  jsx("span", { style: { width: 42, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 4 }, children: oldCell }),
-                  jsx("span", { style: { width: 42, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 6 }, children: newCell }),
-                  jsx("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: l.text }),
-                ],
-              });
-            }),
-          }),
-        ],
-      });
-    }
+    diffWindow = jsx(DiffWindow, {
+      file: selected.path,
+      untracked: selected.untracked,
+      diffLines,
+      diffError,
+      onClose: () => {
+        setSelected(null);
+        setDiffLines(null);
+        setDiffError(null);
+      },
+    });
   }
 
   return jsx("div", {
@@ -205,7 +170,7 @@ export function Changes({ cwd, sessionId, rpc }) {
         }),
       }),
       jsx("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: list }),
-      diffPanel,
+      diffWindow,
     ],
   });
 }
