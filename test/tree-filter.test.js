@@ -14,3 +14,14 @@ test("filterRows: 按 name/path 过滤，空 q 原样", () => {
   assert.equal(filterRows(rows, "").length, 3);
   assert.equal(filterRows(rows, "zzz").length, 0);
 });
+
+test("filterRows: 匹配 rel（真实行形状 rel/name/isDir）", () => {
+  const rows = [
+    { name: "src", rel: "src", isDir: true },
+    { name: "a.js", rel: "src/a.js", isDir: false },
+    { name: "lib", rel: "lib", isDir: true },
+  ];
+  assert.equal(filterRows(rows, "src").length, 2); // dir + 其子文件（rel 含 src/）
+  assert.equal(filterRows(rows, "a.js").length, 1);
+  assert.equal(filterRows(rows, "").length, 3);
+});

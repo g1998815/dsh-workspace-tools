@@ -142,7 +142,9 @@ function fileGlyph(name2, isDir) {
 function filterRows(rows, q) {
   const query = (q ?? "").trim().toLowerCase();
   if (!query) return rows;
-  return rows.filter((r) => (r.name ?? "").toLowerCase().includes(query) || (r.path ?? "").toLowerCase().includes(query));
+  return rows.filter(
+    (r) => (r.name ?? "").toLowerCase().includes(query) || (r.rel ?? "").toLowerCase().includes(query) || (r.path ?? "").toLowerCase().includes(query)
+  );
 }
 
 // src/components/preview-window.js
@@ -994,6 +996,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
   const [confirmReset, setConfirmReset] = (0, import_react5.useState)(false);
   const [splitPct, setSplitPct] = (0, import_react5.useState)(50);
   const [previewLines, setPreviewLines] = (0, import_react5.useState)(null);
+  const [opError, setOpError] = (0, import_react5.useState)(null);
   const load = (0, import_react5.useCallback)(() => {
     if (!cwd) {
       setGroups([]);
@@ -1004,12 +1007,16 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setHistStatus("ready");
       setError(null);
       setHistError(null);
+      setSelCommit(null);
+      setConfirmReset(false);
+      setOpError(null);
       onCountChange?.(0);
       return;
     }
     setStatus("loading");
     setHistStatus("loading");
     setHistError(null);
+    setOpError(null);
     Promise.all([
       callRpc(rpc, "git.listChanges", { cwd, sessionId }),
       callRpc(rpc, "git.branch", { cwd, sessionId }),
@@ -1030,6 +1037,8 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setStatus("ready");
       setError(null);
       setHistStatus("ready");
+      setSelCommit(null);
+      setConfirmReset(false);
       onCountChange?.(changes.length);
     }).catch((err) => {
       const msg = String(err?.message ?? err);
@@ -1081,6 +1090,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
   const commitSelected = (0, import_react5.useCallback)(() => {
     const files = [...checked];
     if (files.length === 0) return;
+    setOpError(null);
     callRpc(rpc, "git.commit", { cwd, sessionId, message: commitMsg.trim(), files }).then(() => {
       setChecked(/* @__PURE__ */ new Set());
       setCommitMsg("");
@@ -1088,11 +1098,11 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setError(null);
       load();
     }).catch((err) => {
-      setStatus("error");
-      setError(String(err?.message ?? err));
+      setOpError(String(err?.message ?? err));
     });
   }, [cwd, rpc, sessionId, checked, commitMsg, load]);
   const commitAll = (0, import_react5.useCallback)(() => {
+    setOpError(null);
     callRpc(rpc, "git.commit", { cwd, sessionId, message: commitMsg.trim() }).then(() => {
       setChecked(/* @__PURE__ */ new Set());
       setCommitMsg("");
@@ -1100,8 +1110,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setError(null);
       load();
     }).catch((err) => {
-      setStatus("error");
-      setError(String(err?.message ?? err));
+      setOpError(String(err?.message ?? err));
     });
   }, [cwd, rpc, sessionId, commitMsg, load]);
   const previewSelected = (0, import_react5.useCallback)(() => {
@@ -1131,6 +1140,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setConfirmReset(true);
       return;
     }
+    setOpError(null);
     callRpc(rpc, "git.reset", { cwd, sessionId, target: selCommit.hash }).then(() => {
       setSelCommit(null);
       setConfirmReset(false);
@@ -1138,8 +1148,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setError(null);
       load();
     }).catch((err) => {
-      setHistStatus("error");
-      setHistError(String(err?.message ?? err));
+      setOpError(String(err?.message ?? err));
     });
   }, [cwd, rpc, sessionId, selCommit, confirmReset, load]);
   const onSplitDown = (0, import_react5.useCallback)((e) => {
@@ -1349,8 +1358,9 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
           (0, import_jsx_runtime6.jsx)("button", {
             type: "button",
             "data-wt-commit-all": true,
+            disabled: msgEmpty,
             onClick: commitAll,
-            style: BTN2,
+            style: { ...BTN2, opacity: msgEmpty ? 0.45 : 1, cursor: msgEmpty ? "default" : "pointer" },
             children: "\u5168\u90E8\u63D0\u4EA4"
           }),
           (0, import_jsx_runtime6.jsx)("button", {
@@ -1420,6 +1430,11 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
     style: { height: `${splitPct}%`, minHeight: 0, flexShrink: 0, display: "flex", flexDirection: "column" },
     children: [
       toolRow,
+      opError && (0, import_jsx_runtime6.jsx)("div", {
+        "data-wt-op-error": true,
+        style: { padding: "4px 8px", color: "#e06c75", fontSize: 12, flexShrink: 0, background: "rgba(224,108,117,0.08)" },
+        children: opError
+      }),
       (0, import_jsx_runtime6.jsx)("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: list })
     ]
   });

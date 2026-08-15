@@ -52,6 +52,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
   const [confirmReset, setConfirmReset] = useState(false);
   const [splitPct, setSplitPct] = useState(50); // 上半区高度百分比
   const [previewLines, setPreviewLines] = useState(null); // 预览选中的拼接 diff
+  const [opError, setOpError] = useState(null); // 提交/回退等操作失败的小型内联提示（不影响列表 status）
 
   // 并行加载：变更 + 分支 + 历史（recentMessages 复用 commits 前 5 条 subject）
   const load = useCallback(() => {
@@ -64,12 +65,16 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setHistStatus("ready");
       setError(null);
       setHistError(null);
+      setSelCommit(null);
+      setConfirmReset(false);
+      setOpError(null);
       onCountChange?.(0);
       return;
     }
     setStatus("loading");
     setHistStatus("loading");
     setHistError(null);
+    setOpError(null);
     Promise.all([
       callRpc(rpc, "git.listChanges", { cwd, sessionId }),
       callRpc(rpc, "git.branch", { cwd, sessionId }),
@@ -92,6 +97,8 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
         setStatus("ready");
         setError(null);
         setHistStatus("ready");
+        setSelCommit(null);
+        setConfirmReset(false);
         onCountChange?.(changes.length);
       })
       .catch((err) => {
@@ -150,10 +157,11 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
 
   const rows = useMemo(() => visibleRows(groups, collapsed), [groups, collapsed]);
 
-  // 提交选中（files=勾选路径）；失败复用 error 行提示
+  // 提交选中（files=勾选路径）；失败用 opError 小型横幅提示，不影响列表加载态
   const commitSelected = useCallback(() => {
     const files = [...checked];
     if (files.length === 0) return;
+    setOpError(null);
     callRpc(rpc, "git.commit", { cwd, sessionId, message: commitMsg.trim(), files })
       .then(() => {
         setChecked(new Set());
@@ -163,13 +171,13 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
         load();
       })
       .catch((err) => {
-        setStatus("error");
-        setError(String(err?.message ?? err));
+        setOpError(String(err?.message ?? err));
       });
   }, [cwd, rpc, sessionId, checked, commitMsg, load]);
 
   // 全部提交（无 files → host add -A）
   const commitAll = useCallback(() => {
+    setOpError(null);
     callRpc(rpc, "git.commit", { cwd, sessionId, message: commitMsg.trim() })
       .then(() => {
         setChecked(new Set());
@@ -179,8 +187,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
         load();
       })
       .catch((err) => {
-        setStatus("error");
-        setError(String(err?.message ?? err));
+        setOpError(String(err?.message ?? err));
       });
   }, [cwd, rpc, sessionId, commitMsg, load]);
 
@@ -216,6 +223,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setConfirmReset(true);
       return;
     }
+    setOpError(null);
     callRpc(rpc, "git.reset", { cwd, sessionId, target: selCommit.hash })
       .then(() => {
         setSelCommit(null);
@@ -225,8 +233,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
         load();
       })
       .catch((err) => {
-        setHistStatus("error");
-        setHistError(String(err?.message ?? err));
+        setOpError(String(err?.message ?? err));
       });
   }, [cwd, rpc, sessionId, selCommit, confirmReset, load]);
 
@@ -448,8 +455,9 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
           jsx("button", {
             type: "button",
             "data-wt-commit-all": true,
+            disabled: msgEmpty,
             onClick: commitAll,
-            style: BTN,
+            style: { ...BTN, opacity: msgEmpty ? 0.45 : 1, cursor: msgEmpty ? "default" : "pointer" },
             children: "全部提交",
           }),
           jsx("button", {
@@ -527,6 +535,12 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
     style: { height: `${splitPct}%`, minHeight: 0, flexShrink: 0, display: "flex", flexDirection: "column" },
     children: [
       toolRow,
+      opError &&
+        jsx("div", {
+          "data-wt-op-error": true,
+          style: { padding: "4px 8px", color: "#e06c75", fontSize: 12, flexShrink: 0, background: "rgba(224,108,117,0.08)" },
+          children: opError,
+        }),
       jsx("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: list }),
     ],
   });

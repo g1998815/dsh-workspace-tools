@@ -110,3 +110,14 @@ test("currentBranch: 提交后返回分支名，init 未提交时为空", async 
     repo.cleanup();
   }
 });
+
+test("logCommits: 零提交仓库返回空历史（unborn HEAD）", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "dshwt-gh-"));
+  try {
+    execFileSync("git", ["-c", "core.quotepath=false", "init", "-q"], { cwd: dir });
+    const { commits } = await logCommits(dir);
+    assert.deepEqual(commits, []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

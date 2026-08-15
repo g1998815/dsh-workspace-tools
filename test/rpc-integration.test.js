@@ -154,3 +154,12 @@ test("fs.readImage: 超过图片上限 → bad-request 图片过大", async () =
   assert.equal(res.error.code, "bad-request");
   assert.match(res.error.message, /过大/);
 });
+
+test("git.commit: files 非数组 → bad-request（校验先于任何 git 调用）", async () => {
+  const { handler, sessions } = captureHandler({});
+  sessions.set("s1", { header: { cwd: "/w" } });
+  const res = await handler("git.commit", { cwd: "/w", message: "m", files: "oops", sessionId: "s1" });
+  assert.equal(res.ok, false);
+  assert.equal(res.error.code, "bad-request");
+  assert.match(res.error.message, /字符串数组/);
+});
