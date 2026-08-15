@@ -161,6 +161,8 @@ var TEXT_EXTENSIONS = /* @__PURE__ */ new Set([
   "ts",
   "jsx",
   "tsx",
+  "mjs",
+  "cjs",
   "md",
   "json",
   "java",
@@ -11405,6 +11407,26 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
     setOpen(true);
     setTab(id);
   }, []);
+  const railWidth = open ? railW : 56;
+  (0, import_react8.useEffect)(() => {
+    if (typeof document === "undefined") return;
+    const frame = document.querySelector('[class$="_frame"]');
+    if (!frame) return;
+    frame.style.gridTemplateColumns = `280px 1fr 0px ${railWidth}px`;
+    let spacer = document.getElementById("dshwt-rail-spacer");
+    if (!spacer) {
+      spacer = document.createElement("div");
+      spacer.id = "dshwt-rail-spacer";
+      spacer.setAttribute("data-wt-rail-spacer", "true");
+      spacer.style.gridColumn = "4";
+      spacer.style.gridRow = "1 / -1";
+      frame.appendChild(spacer);
+    }
+    return () => {
+      frame.style.gridTemplateColumns = "";
+      document.getElementById("dshwt-rail-spacer")?.remove();
+    };
+  }, [railWidth]);
   return (0, import_jsx_runtime10.jsx)("div", {
     "data-wt-rail": true,
     "data-collapsed": open ? void 0 : true,
@@ -11434,27 +11456,6 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
           borderLeft: "1px solid var(--dsw-alias-border-l2, #333)"
         }
       }),
-      open && (0, import_jsx_runtime10.jsx)("button", {
-        type: "button",
-        "data-wt-toggle": true,
-        "aria-label": "\u6536\u8D77\u5DE5\u5177\u4FA7\u8FB9\u680F",
-        title: "\u6536\u8D77",
-        onClick: () => setOpen(false),
-        style: {
-          width: 18,
-          border: "none",
-          borderLeft: "1px solid var(--dsw-alias-border-l2, #333)",
-          background: "var(--dsw-alias-bg-float, #1f1f1f)",
-          color: "var(--dsw-alias-text-secondary, #999)",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: "10px",
-          padding: 0
-        },
-        children: "\u25B8"
-      }),
       open && (0, import_jsx_runtime10.jsx)("div", {
         "data-wt-panel": true,
         style: {
@@ -11476,6 +11477,25 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
               flexShrink: 0
             },
             children: [
+              // M5 需求 2：收起按钮放在「文件」页签左侧（原来在 rail 独立窄条）
+              (0, import_jsx_runtime10.jsx)("button", {
+                type: "button",
+                "data-wt-toggle": true,
+                "aria-label": "\u6536\u8D77\u5DE5\u5177\u4FA7\u8FB9\u680F",
+                title: "\u6536\u8D77",
+                onClick: () => setOpen(false),
+                style: {
+                  padding: "8px 10px",
+                  background: "none",
+                  border: "none",
+                  borderRight: "1px solid var(--dsw-alias-border-l2, #333)",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  color: "var(--dsw-alias-text-secondary, #999)",
+                  flexShrink: 0
+                },
+                children: "\u25B8"
+              }),
               TABS.map(
                 (t) => (0, import_jsx_runtime10.jsx)("button", {
                   key: t.id,
@@ -11523,7 +11543,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
           })
         ]
       }),
-      // ── 收起态：56px 窄 rail，竖排四图标（同左侧边栏收起样式，M5）──
+      // ── 收起态：56px 窄 rail，竖排图标（M5 需求 2：文件图标上方加「展开」按钮）──
       !open && (0, import_jsx_runtime10.jsx)("div", {
         "data-wt-rail-icons": true,
         style: {
@@ -11537,6 +11557,16 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
           borderLeft: "1px solid var(--dsw-alias-border-l2, #333)"
         },
         children: [
+          // M5 需求 2：展开右侧边栏按钮（文件图标上面）
+          (0, import_jsx_runtime10.jsx)("button", {
+            type: "button",
+            "data-wt-expand": true,
+            title: "\u5C55\u5F00\u53F3\u4FA7\u8FB9\u680F",
+            "aria-label": "\u5C55\u5F00\u53F3\u4FA7\u8FB9\u680F",
+            onClick: () => setOpen(true),
+            style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--dsw-alias-text-secondary, #999)" },
+            children: "\u25C2"
+          }),
           (0, import_jsx_runtime10.jsx)("button", {
             type: "button",
             "data-wt-icon": "files",
@@ -11561,15 +11591,13 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
             style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" },
             children: "\u{1F4AC}"
           }),
+          // M5 需求 3：终端图标只弹控制台，不展开右侧边栏
           (0, import_jsx_runtime10.jsx)("button", {
             type: "button",
             "data-wt-icon": "console",
             title: "\u7EC8\u7AEF",
             "data-active": consoleOpen || void 0,
-            onClick: () => {
-              setOpen(true);
-              setConsoleOpen(true);
-            },
+            onClick: () => setConsoleOpen((v2) => !v2),
             style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" },
             children: "\u{1F5A5}\uFE0F"
           })
