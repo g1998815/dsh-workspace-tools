@@ -1589,6 +1589,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
     "data-wt-changes": true,
     style: { display: "flex", flexDirection: "column", height: "100%", minHeight: 0 },
     children: [infoRow, upperPane, splitBar, lowerPane, diffWindow, detail && (0, import_jsx_runtime8.jsx)(CommitDetailWindow, {
+      key: detail.hash,
       target: detail.hash,
       cwd,
       sessionId,

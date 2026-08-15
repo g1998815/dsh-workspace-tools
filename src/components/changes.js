@@ -597,6 +597,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
     style: { display: "flex", flexDirection: "column", height: "100%", minHeight: 0 },
     children: [infoRow, upperPane, splitBar, lowerPane, diffWindow, detail &&
       jsx(CommitDetailWindow, {
+        key: detail.hash,
         target: detail.hash,
         cwd,
         sessionId,
