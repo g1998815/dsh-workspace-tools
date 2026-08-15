@@ -32,8 +32,8 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/components/workspace-browser.js
-var import_jsx_runtime5 = require("react/jsx-runtime");
-var import_react4 = require("react");
+var import_jsx_runtime6 = require("react/jsx-runtime");
+var import_react5 = require("react");
 
 // src/components/session-list.js
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -71,8 +71,8 @@ function SessionList({ useSessions, openSession }) {
 }
 
 // src/components/file-tree.js
-var import_jsx_runtime2 = require("react/jsx-runtime");
-var import_react = require("react");
+var import_jsx_runtime3 = require("react/jsx-runtime");
+var import_react2 = require("react");
 
 // lib/constants.js
 var RPC_CHANNEL = "/workspace-tools";
@@ -138,19 +138,252 @@ function fileGlyph(name2, isDir) {
   return GLYPHS[ext] ?? "\u{1F4C4}";
 }
 
+// src/components/preview-window.js
+var import_jsx_runtime2 = require("react/jsx-runtime");
+var import_react = require("react");
+
+// lib/services/file-preview.js
+var TEXT_MAX_BYTES = 256 * 1024;
+var IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+var TEXT_EXTENSIONS = /* @__PURE__ */ new Set([
+  "txt",
+  "js",
+  "ts",
+  "jsx",
+  "tsx",
+  "md",
+  "json",
+  "java",
+  "py",
+  "c",
+  "h",
+  "cpp",
+  "cc",
+  "go",
+  "rs",
+  "yml",
+  "yaml",
+  "xml",
+  "html",
+  "htm",
+  "css",
+  "scss",
+  "sh",
+  "bash",
+  "zsh",
+  "sql",
+  "toml",
+  "ini",
+  "cfg",
+  "conf",
+  "log",
+  "csv",
+  "env",
+  "gitignore",
+  "editorconfig",
+  "dockerfile"
+]);
+var IMAGE_EXTENSIONS = /* @__PURE__ */ new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif"]);
+function previewKind(name2) {
+  if (typeof name2 !== "string") return null;
+  const idx = name2.lastIndexOf(".");
+  if (idx === -1 || idx === name2.length - 1) return null;
+  const ext = name2.slice(idx + 1).toLowerCase();
+  if (TEXT_EXTENSIONS.has(ext)) return "text";
+  if (IMAGE_EXTENSIONS.has(ext)) return "image";
+  return null;
+}
+
+// src/components/preview-window.js
+var WINDOW_W = 640;
+var MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", bmp: "image/bmp", ico: "image/x-icon", avif: "image/avif" };
+function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
+  const kind = previewKind(file);
+  const [pos, setPos] = (0, import_react.useState)(() => {
+    const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+    return { x: Math.max(8, vw - WINDOW_W - 24), y: 64 };
+  });
+  const [state, setState] = (0, import_react.useState)("loading");
+  const [error, setError] = (0, import_react.useState)(null);
+  const [textLines, setTextLines] = (0, import_react.useState)(null);
+  const [imgUrl, setImgUrl] = (0, import_react.useState)(null);
+  const [query, setQuery] = (0, import_react.useState)("");
+  const [matchIdx, setMatchIdx] = (0, import_react.useState)(0);
+  const bodyRef = (0, import_react.useRef)(null);
+  const dragRef = (0, import_react.useRef)(null);
+  (0, import_react.useEffect)(() => {
+    let cancelled = false;
+    setState("loading");
+    setQuery("");
+    setMatchIdx(0);
+    setTextLines(null);
+    setImgUrl(null);
+    if (kind === "text") {
+      callRpc(rpc, "fs.readText", { cwd, sessionId, file }).then((value) => {
+        if (cancelled) return;
+        setTextLines(value.text.split("\n"));
+        setState("ready");
+      }).catch((err) => {
+        if (cancelled) return;
+        setState("error");
+        setError(String(err?.message ?? err));
+      });
+    } else if (kind === "image") {
+      callRpc(rpc, "fs.readImage", { cwd, sessionId, file }).then((value) => {
+        if (cancelled) return;
+        const ext = file.includes(".") ? file.split(".").pop().toLowerCase() : "";
+        setImgUrl(`data:${MIME[ext] ?? "image/png"};base64,${value.base64}`);
+        setState("ready");
+      }).catch((err) => {
+        if (cancelled) return;
+        setState("error");
+        setError(String(err?.message ?? err));
+      });
+    } else {
+      setState("error");
+      setError("\u4E0D\u652F\u6301\u9884\u89C8\u8BE5\u6587\u4EF6\u7C7B\u578B");
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [file, cwd, rpc, sessionId, kind]);
+  const matches = (0, import_react.useMemo)(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || !textLines) return [];
+    const out = [];
+    textLines.forEach((t, i) => {
+      if (t.toLowerCase().includes(q)) out.push(i);
+    });
+    return out;
+  }, [query, textLines]);
+  (0, import_react.useEffect)(() => {
+    if (!bodyRef.current || matches.length === 0) return;
+    const idx = matches[Math.min(matchIdx, matches.length - 1)];
+    bodyRef.current.querySelector(`[data-line="${idx}"]`)?.scrollIntoView({ block: "center" });
+  }, [matchIdx, matches]);
+  const onTitleDown = (0, import_react.useCallback)(
+    (e) => {
+      if (e.target.closest("input,button")) return;
+      dragRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
+      const move = (ev) => setPos({ x: Math.max(0, ev.clientX - dragRef.current.dx), y: Math.max(0, ev.clientY - dragRef.current.dy) });
+      const up = () => {
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    },
+    [pos]
+  );
+  const nextMatch = (0, import_react.useCallback)(() => {
+    if (matches.length) setMatchIdx((i) => (i + 1) % matches.length);
+  }, [matches.length]);
+  const prevMatch = (0, import_react.useCallback)(() => {
+    if (matches.length) setMatchIdx((i) => (i - 1 + matches.length) % matches.length);
+  }, [matches.length]);
+  let body;
+  if (state === "error") {
+    body = (0, import_jsx_runtime2.jsx)("div", { "data-wt-preview-error": true, style: { padding: 16, color: "#e06c75" }, children: error });
+  } else if (state === "loading") {
+    body = (0, import_jsx_runtime2.jsx)("div", { "data-wt-preview-loading": true, style: { padding: 16, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
+  } else if (kind === "image") {
+    body = (0, import_jsx_runtime2.jsx)("div", { style: { flex: 1, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }, children: (0, import_jsx_runtime2.jsx)("img", { "data-wt-preview-image": true, src: imgUrl, alt: file, style: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 4 } }) });
+  } else {
+    body = (0, import_jsx_runtime2.jsx)("div", {
+      ref: bodyRef,
+      "data-wt-preview-text": true,
+      style: { flex: 1, overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "12px", padding: "4px 10px 12px", whiteSpace: "pre" },
+      children: textLines.map((t, i) => {
+        const isMatch = matches.includes(i);
+        return (0, import_jsx_runtime2.jsx)("div", {
+          key: i,
+          "data-line": i,
+          "data-wt-preview-line": true,
+          "data-wt-match": isMatch || void 0,
+          style: { background: isMatch ? "rgba(230,180,80,0.28)" : "none", color: isMatch ? "#f0d59a" : void 0 },
+          children: t || " "
+        });
+      })
+    });
+  }
+  const hasQuery = query.trim() !== "";
+  return (0, import_jsx_runtime2.jsx)("div", {
+    "data-wt-preview-window": true,
+    style: {
+      position: "fixed",
+      left: pos.x,
+      top: pos.y,
+      width: WINDOW_W,
+      maxWidth: "94vw",
+      height: "70vh",
+      minHeight: 240,
+      display: "flex",
+      flexDirection: "column",
+      background: "var(--dsw-alias-bg-base, #1a1a1a)",
+      border: "1px solid var(--dsw-alias-border-l2, #333)",
+      borderRadius: 8,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+      zIndex: 100,
+      fontSize: 12,
+      overflow: "hidden"
+    },
+    children: [
+      (0, import_jsx_runtime2.jsx)("div", {
+        "data-wt-preview-title": true,
+        onMouseDown: onTitleDown,
+        style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", cursor: "move", background: "var(--dsw-alias-bg-float, #1f1f1f)", borderBottom: "1px solid var(--dsw-alias-border-l2, #333)", flexShrink: 0, userSelect: "none" },
+        children: [
+          (0, import_jsx_runtime2.jsx)("span", { style: { fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, children: file }),
+          (0, import_jsx_runtime2.jsx)("span", { style: { fontSize: 10, padding: "1px 5px", border: "1px solid #888", borderRadius: 3, color: "#aaa", flexShrink: 0 }, children: kind ?? "" }),
+          kind === "text" && hasQuery && (0, import_jsx_runtime2.jsx)("span", { "data-wt-preview-count": true, style: { color: "#e6b450", fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }, children: matches.length ? `${Math.min(matchIdx + 1, matches.length)}/${matches.length}` : "0/0" }),
+          (0, import_jsx_runtime2.jsx)("button", {
+            type: "button",
+            "data-wt-preview-close": true,
+            onClick: onClose,
+            title: "\u5173\u95ED\uFF08Esc\uFF09",
+            style: { marginLeft: "auto", background: "none", border: "none", color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", fontSize: 14, padding: "0 4px", flexShrink: 0 },
+            children: "\u2715"
+          })
+        ]
+      }),
+      kind === "text" && (0, import_jsx_runtime2.jsx)("div", { style: { display: "flex", gap: 6, padding: "5px 10px", borderBottom: "1px solid var(--dsw-alias-border-l2, #333)", flexShrink: 0, alignItems: "center" }, children: [
+        (0, import_jsx_runtime2.jsx)("input", {
+          "data-wt-preview-search": true,
+          type: "text",
+          placeholder: "\u641C\u7D22\u2026",
+          value: query,
+          onChange: (e) => {
+            setQuery(e.target.value);
+            setMatchIdx(0);
+          },
+          onKeyDown: (e) => {
+            if (e.key === "Enter") e.shiftKey ? prevMatch() : nextMatch();
+            if (e.key === "Escape") onClose();
+          },
+          style: { flex: 1, background: "var(--dsw-alias-bg-base, #141414)", border: "1px solid var(--dsw-alias-border-l2, #333)", borderRadius: 4, color: "var(--dsw-alias-text-primary, #ddd)", padding: "3px 8px", fontSize: 12, outline: "none" }
+        }),
+        hasQuery && (0, import_jsx_runtime2.jsx)("button", { type: "button", "data-wt-preview-prev": true, onClick: prevMatch, style: { background: "none", border: "1px solid var(--dsw-alias-border-l2, #444)", borderRadius: 4, color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", padding: "1px 7px", fontSize: 11 }, children: "\u2191" }),
+        hasQuery && (0, import_jsx_runtime2.jsx)("button", { type: "button", "data-wt-preview-next": true, onClick: nextMatch, style: { background: "none", border: "1px solid var(--dsw-alias-border-l2, #444)", borderRadius: 4, color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", padding: "1px 7px", fontSize: 11 }, children: "\u2193" })
+      ] }),
+      body
+    ]
+  });
+}
+
 // src/components/file-tree.js
 function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
-  const [nodes, setNodes] = (0, import_react.useState)(() => /* @__PURE__ */ new Map());
-  const [expanded, setExpanded] = (0, import_react.useState)(() => /* @__PURE__ */ new Set());
-  const [selected, setSelected] = (0, import_react.useState)(null);
-  const [menu, setMenu] = (0, import_react.useState)(null);
-  const panelRef = (0, import_react.useRef)(null);
-  const menuRef = (0, import_react.useRef)(null);
-  const nodesRef = (0, import_react.useRef)(nodes);
-  (0, import_react.useEffect)(() => {
+  const [nodes, setNodes] = (0, import_react2.useState)(() => /* @__PURE__ */ new Map());
+  const [expanded, setExpanded] = (0, import_react2.useState)(() => /* @__PURE__ */ new Set());
+  const [selected, setSelected] = (0, import_react2.useState)(null);
+  const [preview, setPreview] = (0, import_react2.useState)(null);
+  const [menu, setMenu] = (0, import_react2.useState)(null);
+  const panelRef = (0, import_react2.useRef)(null);
+  const menuRef = (0, import_react2.useRef)(null);
+  const nodesRef = (0, import_react2.useRef)(nodes);
+  (0, import_react2.useEffect)(() => {
     nodesRef.current = nodes;
   }, [nodes]);
-  (0, import_react.useEffect)(() => {
+  (0, import_react2.useEffect)(() => {
     let cancelled = false;
     setNodes(/* @__PURE__ */ new Map());
     setExpanded(/* @__PURE__ */ new Set());
@@ -176,7 +409,7 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
       cancelled = true;
     };
   }, [cwd, rpc, sessionId]);
-  const loadDir = (0, import_react.useCallback)(
+  const loadDir = (0, import_react2.useCallback)(
     (rel) => {
       const current = nodesRef.current.get(rel);
       if (current && current.status !== "error") return;
@@ -202,7 +435,7 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
     },
     [cwd, rpc, sessionId]
   );
-  const toggle = (0, import_react.useCallback)(
+  const toggle = (0, import_react2.useCallback)(
     (rel) => {
       const wasOpen = expanded.has(rel);
       setExpanded((prev) => toggleExpanded(prev, rel));
@@ -210,9 +443,9 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
     },
     [expanded, loadDir]
   );
-  const rows = (0, import_react.useMemo)(() => visibleRows(nodes, expanded), [nodes, expanded]);
+  const rows = (0, import_react2.useMemo)(() => visibleRows(nodes, expanded), [nodes, expanded]);
   const root = nodes.get("");
-  (0, import_react.useEffect)(() => {
+  (0, import_react2.useEffect)(() => {
     if (!menu) return void 0;
     const onDown = (ev) => {
       if (menuRef.current && !menuRef.current.contains(ev.target)) setMenu(null);
@@ -227,14 +460,14 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
       window.removeEventListener("keydown", onKey);
     };
   }, [menu]);
-  const openMenu = (0, import_react.useCallback)((ev, row) => {
+  const openMenu = (0, import_react2.useCallback)((ev, row) => {
     ev.preventDefault();
     ev.stopPropagation();
     const rect = panelRef.current?.getBoundingClientRect();
     setMenu({ x: ev.clientX - (rect?.left ?? 0), y: ev.clientY - (rect?.top ?? 0), ...row });
   }, []);
-  const closeMenu = (0, import_react.useCallback)(() => setMenu(null), []);
-  const onCopy = (0, import_react.useCallback)(async () => {
+  const closeMenu = (0, import_react2.useCallback)(() => setMenu(null), []);
+  const onCopy = (0, import_react2.useCallback)(async () => {
     if (!menu) return;
     try {
       await navigator.clipboard.writeText(menu.absolute || menu.rel);
@@ -242,7 +475,7 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
     }
     closeMenu();
   }, [menu, closeMenu]);
-  const onInsert = (0, import_react.useCallback)(() => {
+  const onInsert = (0, import_react2.useCallback)(() => {
     if (!menu || !sessionId) {
       closeMenu();
       return;
@@ -252,18 +485,18 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
   }, [menu, sessionId, insertIntoComposer, closeMenu]);
   let body;
   if (!cwd) {
-    body = (0, import_jsx_runtime2.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u5F53\u524D\u4F1A\u8BDD\u6CA1\u6709\u5DE5\u4F5C\u76EE\u5F55" });
+    body = (0, import_jsx_runtime3.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u5F53\u524D\u4F1A\u8BDD\u6CA1\u6709\u5DE5\u4F5C\u76EE\u5F55" });
   } else if (!root || root.status === "loading") {
-    body = (0, import_jsx_runtime2.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
+    body = (0, import_jsx_runtime3.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
   } else if (root.status === "error") {
-    body = (0, import_jsx_runtime2.jsx)("div", { "data-wt-error": true, style: { padding: 12, color: "#e06c75" }, children: root.error });
+    body = (0, import_jsx_runtime3.jsx)("div", { "data-wt-error": true, style: { padding: 12, color: "#e06c75" }, children: root.error });
   } else {
-    body = (0, import_jsx_runtime2.jsx)("div", {
+    body = (0, import_jsx_runtime3.jsx)("div", {
       "data-wt-tree": true,
       children: [
         rows.map((row) => {
           const isOpen = row.isDir && expanded.has(row.rel);
-          return (0, import_jsx_runtime2.jsx)("div", {
+          return (0, import_jsx_runtime3.jsx)("div", {
             key: row.rel,
             role: "button",
             tabIndex: 0,
@@ -272,7 +505,12 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
             "data-selected": selected === row.rel || void 0,
             onClick: () => {
               setSelected(row.rel);
-              if (row.isDir) toggle(row.rel);
+              if (row.isDir) {
+                toggle(row.rel);
+              } else {
+                const kind = previewKind(row.name);
+                if (kind) setPreview({ rel: row.rel, name: row.name });
+              }
             },
             onContextMenu: (ev) => openMenu(ev, row),
             onKeyDown: (ev) => {
@@ -293,14 +531,14 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
               background: selected === row.rel ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
             },
             children: [
-              (0, import_jsx_runtime2.jsx)("span", { style: { width: 14, flexShrink: 0, display: "inline-block", textAlign: "center" }, children: row.isDir ? isOpen ? "\u25BE" : "\u25B8" : "" }),
-              (0, import_jsx_runtime2.jsx)("span", { children: fileGlyph(row.name, row.isDir) }),
-              (0, import_jsx_runtime2.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: row.name })
+              (0, import_jsx_runtime3.jsx)("span", { style: { width: 14, flexShrink: 0, display: "inline-block", textAlign: "center" }, children: row.isDir ? isOpen ? "\u25BE" : "\u25B8" : "" }),
+              (0, import_jsx_runtime3.jsx)("span", { children: fileGlyph(row.name, row.isDir) }),
+              (0, import_jsx_runtime3.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: row.name })
             ]
           });
         }),
         ...[...expanded].filter((rel) => nodes.get(rel)?.status === "error").map(
-          (rel) => (0, import_jsx_runtime2.jsx)("div", {
+          (rel) => (0, import_jsx_runtime3.jsx)("div", {
             key: `err-${rel}`,
             "data-wt-row-error": true,
             style: { padding: "2px 8px", paddingLeft: 8 + rel.split("/").length * 14, color: "#e06c75", fontSize: "12px" },
@@ -310,13 +548,13 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
       ]
     });
   }
-  return (0, import_jsx_runtime2.jsx)("div", {
+  return (0, import_jsx_runtime3.jsx)("div", {
     ref: panelRef,
     "data-wt-filetree": true,
     style: { position: "relative", minHeight: 0 },
     children: [
       body,
-      menu && (0, import_jsx_runtime2.jsx)("div", {
+      menu && (0, import_jsx_runtime3.jsx)("div", {
         ref: menuRef,
         "data-wt-context-menu": true,
         style: {
@@ -332,27 +570,34 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
           padding: 4
         },
         children: [
-          (0, import_jsx_runtime2.jsx)("div", {
+          (0, import_jsx_runtime3.jsx)("div", {
             role: "menuitem",
             onClick: onCopy,
             style: { padding: "6px 10px", cursor: "pointer", borderRadius: 4 },
             children: "\u590D\u5236\u7EDD\u5BF9\u8DEF\u5F84"
           }),
-          (0, import_jsx_runtime2.jsx)("div", {
+          (0, import_jsx_runtime3.jsx)("div", {
             role: "menuitem",
             onClick: onInsert,
             style: { padding: "6px 10px", cursor: "pointer", borderRadius: 4 },
             children: "\u53D1\u9001\u5230\u5BF9\u8BDD\u6846"
           })
         ]
+      }),
+      preview && (0, import_jsx_runtime3.jsx)(PreviewWindow, {
+        file: preview.rel,
+        cwd,
+        sessionId,
+        rpc,
+        onClose: () => setPreview(null)
       })
     ]
   });
 }
 
 // src/components/changes.js
-var import_jsx_runtime4 = require("react/jsx-runtime");
-var import_react3 = require("react");
+var import_jsx_runtime5 = require("react/jsx-runtime");
+var import_react4 = require("react");
 
 // src/lib/git-changes.js
 function normalizeChanges(raw) {
@@ -440,19 +685,19 @@ function parseDiff(text) {
 }
 
 // src/components/diff-window.js
-var import_jsx_runtime3 = require("react/jsx-runtime");
-var import_react2 = require("react");
-var WINDOW_W = 720;
+var import_jsx_runtime4 = require("react/jsx-runtime");
+var import_react3 = require("react");
+var WINDOW_W2 = 720;
 function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
-  const [pos, setPos] = (0, import_react2.useState)(() => {
+  const [pos, setPos] = (0, import_react3.useState)(() => {
     const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
-    return { x: Math.max(8, vw - WINDOW_W - 24), y: 64 };
+    return { x: Math.max(8, vw - WINDOW_W2 - 24), y: 64 };
   });
-  const [query, setQuery] = (0, import_react2.useState)("");
-  const [matchIdx, setMatchIdx] = (0, import_react2.useState)(0);
-  const bodyRef = (0, import_react2.useRef)(null);
-  const dragRef = (0, import_react2.useRef)(null);
-  const matches = (0, import_react2.useMemo)(() => {
+  const [query, setQuery] = (0, import_react3.useState)("");
+  const [matchIdx, setMatchIdx] = (0, import_react3.useState)(0);
+  const bodyRef = (0, import_react3.useRef)(null);
+  const dragRef = (0, import_react3.useRef)(null);
+  const matches = (0, import_react3.useMemo)(() => {
     const q = query.trim().toLowerCase();
     if (!q || !diffLines) return [];
     const out = [];
@@ -461,17 +706,17 @@ function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
     });
     return out;
   }, [query, diffLines]);
-  (0, import_react2.useEffect)(() => {
+  (0, import_react3.useEffect)(() => {
     setQuery("");
     setMatchIdx(0);
   }, [file]);
-  (0, import_react2.useEffect)(() => {
+  (0, import_react3.useEffect)(() => {
     if (!bodyRef.current || matches.length === 0) return;
     const idx = matches[Math.min(matchIdx, matches.length - 1)];
     const el = bodyRef.current.querySelector(`[data-line="${idx}"]`);
     el?.scrollIntoView({ block: "center" });
   }, [matchIdx, matches]);
-  const onTitleDown = (0, import_react2.useCallback)(
+  const onTitleDown = (0, import_react3.useCallback)(
     (e) => {
       if (e.target.closest("input,button")) return;
       dragRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
@@ -487,19 +732,19 @@ function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
     },
     [pos]
   );
-  const nextMatch = (0, import_react2.useCallback)(() => {
+  const nextMatch = (0, import_react3.useCallback)(() => {
     if (matches.length) setMatchIdx((i) => (i + 1) % matches.length);
   }, [matches.length]);
-  const prevMatch = (0, import_react2.useCallback)(() => {
+  const prevMatch = (0, import_react3.useCallback)(() => {
     if (matches.length) setMatchIdx((i) => (i - 1 + matches.length) % matches.length);
   }, [matches.length]);
   let body;
   if (diffError) {
-    body = (0, import_jsx_runtime3.jsx)("div", { "data-wt-diff-error": true, style: { padding: 16, color: "#e06c75" }, children: diffError });
+    body = (0, import_jsx_runtime4.jsx)("div", { "data-wt-diff-error": true, style: { padding: 16, color: "#e06c75" }, children: diffError });
   } else if (!diffLines) {
-    body = (0, import_jsx_runtime3.jsx)("div", { "data-wt-diff-loading": true, style: { padding: 16, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D diff\u2026" });
+    body = (0, import_jsx_runtime4.jsx)("div", { "data-wt-diff-loading": true, style: { padding: 16, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D diff\u2026" });
   } else {
-    body = (0, import_jsx_runtime3.jsx)("div", {
+    body = (0, import_jsx_runtime4.jsx)("div", {
       ref: bodyRef,
       "data-wt-diff": true,
       style: { flex: 1, overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "11px", paddingBottom: 8 },
@@ -525,7 +770,7 @@ function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
         }
         const oldCell = l.oldLine !== null ? String(l.oldLine) : " ";
         const newCell = l.newLine !== null ? String(l.newLine) : " ";
-        return (0, import_jsx_runtime3.jsx)("div", {
+        return (0, import_jsx_runtime4.jsx)("div", {
           key: i,
           "data-line": i,
           "data-wt-diff-line": true,
@@ -533,22 +778,22 @@ function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
           "data-wt-match": isMatch || void 0,
           style: { display: "flex", background: bg, color, padding: "0 8px", whiteSpace: "pre" },
           children: [
-            (0, import_jsx_runtime3.jsx)("span", { style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 4 }, children: oldCell }),
-            (0, import_jsx_runtime3.jsx)("span", { style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 8 }, children: newCell }),
-            (0, import_jsx_runtime3.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: l.text })
+            (0, import_jsx_runtime4.jsx)("span", { style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 4 }, children: oldCell }),
+            (0, import_jsx_runtime4.jsx)("span", { style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 8 }, children: newCell }),
+            (0, import_jsx_runtime4.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: l.text })
           ]
         });
       })
     });
   }
   const hasQuery = query.trim() !== "";
-  return (0, import_jsx_runtime3.jsx)("div", {
+  return (0, import_jsx_runtime4.jsx)("div", {
     "data-wt-diff-window": true,
     style: {
       position: "fixed",
       left: pos.x,
       top: pos.y,
-      width: WINDOW_W,
+      width: WINDOW_W2,
       maxWidth: "94vw",
       height: "66vh",
       minHeight: 240,
@@ -564,7 +809,7 @@ function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
     },
     children: [
       // 标题栏（拖拽把手）
-      (0, import_jsx_runtime3.jsx)("div", {
+      (0, import_jsx_runtime4.jsx)("div", {
         "data-wt-diff-window-title": true,
         onMouseDown: onTitleDown,
         style: {
@@ -579,8 +824,8 @@ function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
           userSelect: "none"
         },
         children: [
-          (0, import_jsx_runtime3.jsx)("span", { style: { fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, children: file }),
-          (0, import_jsx_runtime3.jsx)("span", {
+          (0, import_jsx_runtime4.jsx)("span", { style: { fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, children: file }),
+          (0, import_jsx_runtime4.jsx)("span", {
             style: {
               fontSize: "10px",
               padding: "1px 5px",
@@ -591,7 +836,7 @@ function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
             },
             children: statusLabel(untracked ? "??" : "M")
           }),
-          (0, import_jsx_runtime3.jsx)("input", {
+          (0, import_jsx_runtime4.jsx)("input", {
             "data-wt-diff-search": true,
             type: "text",
             placeholder: "\u641C\u7D22\u2026",
@@ -616,22 +861,22 @@ function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
               outline: "none"
             }
           }),
-          hasQuery && (0, import_jsx_runtime3.jsx)("span", { "data-wt-diff-matchcount": true, style: { color: "#e6b450", fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }, children: matches.length ? `${Math.min(matchIdx + 1, matches.length)}/${matches.length}` : "0/0" }),
-          hasQuery && (0, import_jsx_runtime3.jsx)("button", {
+          hasQuery && (0, import_jsx_runtime4.jsx)("span", { "data-wt-diff-matchcount": true, style: { color: "#e6b450", fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }, children: matches.length ? `${Math.min(matchIdx + 1, matches.length)}/${matches.length}` : "0/0" }),
+          hasQuery && (0, import_jsx_runtime4.jsx)("button", {
             type: "button",
             "data-wt-diff-prev": true,
             onClick: prevMatch,
             style: { background: "none", border: "1px solid var(--dsw-alias-border-l2, #444)", borderRadius: 4, color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", padding: "1px 7px", fontSize: 11, flexShrink: 0 },
             children: "\u2191"
           }),
-          hasQuery && (0, import_jsx_runtime3.jsx)("button", {
+          hasQuery && (0, import_jsx_runtime4.jsx)("button", {
             type: "button",
             "data-wt-diff-next": true,
             onClick: nextMatch,
             style: { background: "none", border: "1px solid var(--dsw-alias-border-l2, #444)", borderRadius: 4, color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", padding: "1px 7px", fontSize: 11, flexShrink: 0 },
             children: "\u2193"
           }),
-          (0, import_jsx_runtime3.jsx)("button", {
+          (0, import_jsx_runtime4.jsx)("button", {
             type: "button",
             "data-wt-diff-close": true,
             onClick: onClose,
@@ -655,14 +900,14 @@ var STATUS_COLOR = {
   R: "#61afef"
 };
 function Changes({ cwd, sessionId, rpc }) {
-  const [groups, setGroups] = (0, import_react3.useState)([]);
-  const [status, setStatus] = (0, import_react3.useState)("loading");
-  const [error, setError] = (0, import_react3.useState)(null);
-  const [collapsed, setCollapsed] = (0, import_react3.useState)(() => /* @__PURE__ */ new Set());
-  const [selected, setSelected] = (0, import_react3.useState)(null);
-  const [diffLines, setDiffLines] = (0, import_react3.useState)(null);
-  const [diffError, setDiffError] = (0, import_react3.useState)(null);
-  const load = (0, import_react3.useCallback)(() => {
+  const [groups, setGroups] = (0, import_react4.useState)([]);
+  const [status, setStatus] = (0, import_react4.useState)("loading");
+  const [error, setError] = (0, import_react4.useState)(null);
+  const [collapsed, setCollapsed] = (0, import_react4.useState)(() => /* @__PURE__ */ new Set());
+  const [selected, setSelected] = (0, import_react4.useState)(null);
+  const [diffLines, setDiffLines] = (0, import_react4.useState)(null);
+  const [diffError, setDiffError] = (0, import_react4.useState)(null);
+  const load = (0, import_react4.useCallback)(() => {
     if (!cwd) {
       setGroups([]);
       setStatus("ready");
@@ -678,14 +923,14 @@ function Changes({ cwd, sessionId, rpc }) {
       setError(String(err?.message ?? err));
     });
   }, [cwd, rpc, sessionId]);
-  (0, import_react3.useEffect)(() => {
+  (0, import_react4.useEffect)(() => {
     setSelected(null);
     setDiffLines(null);
     setDiffError(null);
     setCollapsed(/* @__PURE__ */ new Set());
     load();
   }, [load]);
-  const openFile = (0, import_react3.useCallback)(
+  const openFile = (0, import_react4.useCallback)(
     (c) => {
       setSelected({ path: c.path, untracked: c.untracked });
       setDiffLines(null);
@@ -694,7 +939,7 @@ function Changes({ cwd, sessionId, rpc }) {
     },
     [cwd, rpc, sessionId]
   );
-  const toggleDir = (0, import_react3.useCallback)((dir) => {
+  const toggleDir = (0, import_react4.useCallback)((dir) => {
     setCollapsed((prev) => {
       const next = new Set(prev);
       if (next.has(dir)) next.delete(dir);
@@ -702,19 +947,19 @@ function Changes({ cwd, sessionId, rpc }) {
       return next;
     });
   }, []);
-  const rows = (0, import_react3.useMemo)(() => visibleRows2(groups, collapsed), [groups, collapsed]);
+  const rows = (0, import_react4.useMemo)(() => visibleRows2(groups, collapsed), [groups, collapsed]);
   let list;
   if (status === "loading") {
-    list = (0, import_jsx_runtime4.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
+    list = (0, import_jsx_runtime5.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
   } else if (status === "error") {
-    list = (0, import_jsx_runtime4.jsx)("div", { "data-wt-error": true, style: { padding: 12, color: "#e06c75" }, children: error });
+    list = (0, import_jsx_runtime5.jsx)("div", { "data-wt-error": true, style: { padding: 12, color: "#e06c75" }, children: error });
   } else if (rows.length === 0) {
-    list = (0, import_jsx_runtime4.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u6CA1\u6709\u53D8\u66F4" });
+    list = (0, import_jsx_runtime5.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u6CA1\u6709\u53D8\u66F4" });
   } else {
-    list = (0, import_jsx_runtime4.jsx)("div", {
+    list = (0, import_jsx_runtime5.jsx)("div", {
       "data-wt-changes-list": true,
       children: rows.map(
-        (row) => row.kind === "dir" ? (0, import_jsx_runtime4.jsx)("div", {
+        (row) => row.kind === "dir" ? (0, import_jsx_runtime5.jsx)("div", {
           key: `dir-${row.dir}`,
           "data-wt-changes-dir": true,
           onClick: () => toggleDir(row.dir),
@@ -728,11 +973,11 @@ function Changes({ cwd, sessionId, rpc }) {
             alignItems: "center"
           },
           children: [
-            (0, import_jsx_runtime4.jsx)("span", { children: collapsed.has(row.dir) ? "\u25B8" : "\u25BE" }),
-            (0, import_jsx_runtime4.jsx)("span", { children: row.dir === "" ? "\uFF08\u6839\u76EE\u5F55\uFF09" : row.dir }),
-            (0, import_jsx_runtime4.jsx)("span", { style: { opacity: 0.6 }, children: `${row.count}` })
+            (0, import_jsx_runtime5.jsx)("span", { children: collapsed.has(row.dir) ? "\u25B8" : "\u25BE" }),
+            (0, import_jsx_runtime5.jsx)("span", { children: row.dir === "" ? "\uFF08\u6839\u76EE\u5F55\uFF09" : row.dir }),
+            (0, import_jsx_runtime5.jsx)("span", { style: { opacity: 0.6 }, children: `${row.count}` })
           ]
-        }) : (0, import_jsx_runtime4.jsx)("div", {
+        }) : (0, import_jsx_runtime5.jsx)("div", {
           key: `file-${row.path}`,
           role: "button",
           "data-wt-changes-file": true,
@@ -748,7 +993,7 @@ function Changes({ cwd, sessionId, rpc }) {
             background: selected?.path === row.path ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
           },
           children: [
-            (0, import_jsx_runtime4.jsx)("span", {
+            (0, import_jsx_runtime5.jsx)("span", {
               style: {
                 width: 20,
                 textAlign: "center",
@@ -761,7 +1006,7 @@ function Changes({ cwd, sessionId, rpc }) {
               },
               children: row.status === "??" ? "?" : row.status
             }),
-            (0, import_jsx_runtime4.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: row.base })
+            (0, import_jsx_runtime5.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: row.base })
           ]
         })
       )
@@ -769,7 +1014,7 @@ function Changes({ cwd, sessionId, rpc }) {
   }
   let diffWindow = null;
   if (selected) {
-    diffWindow = (0, import_jsx_runtime4.jsx)(DiffWindow, {
+    diffWindow = (0, import_jsx_runtime5.jsx)(DiffWindow, {
       file: selected.path,
       untracked: selected.untracked,
       diffLines,
@@ -781,13 +1026,13 @@ function Changes({ cwd, sessionId, rpc }) {
       }
     });
   }
-  return (0, import_jsx_runtime4.jsx)("div", {
+  return (0, import_jsx_runtime5.jsx)("div", {
     "data-wt-changes": true,
     style: { display: "flex", flexDirection: "column", height: "100%", minHeight: 0 },
     children: [
-      (0, import_jsx_runtime4.jsx)("div", {
+      (0, import_jsx_runtime5.jsx)("div", {
         style: { display: "flex", justifyContent: "flex-end", padding: "2px 6px", flexShrink: 0 },
-        children: (0, import_jsx_runtime4.jsx)("button", {
+        children: (0, import_jsx_runtime5.jsx)("button", {
           type: "button",
           "data-wt-refresh": true,
           onClick: load,
@@ -795,7 +1040,7 @@ function Changes({ cwd, sessionId, rpc }) {
           children: "\u21BB \u5237\u65B0"
         })
       }),
-      (0, import_jsx_runtime4.jsx)("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: list }),
+      (0, import_jsx_runtime5.jsx)("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: list }),
       diffWindow
     ]
   });
@@ -808,11 +1053,11 @@ var TABS = [
   { id: "sessions", label: "\u4F1A\u8BDD" }
 ];
 function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
-  const [open, setOpen] = (0, import_react4.useState)(true);
-  const [tab, setTab] = (0, import_react4.useState)("files");
+  const [open, setOpen] = (0, import_react5.useState)(true);
+  const [tab, setTab] = (0, import_react5.useState)("files");
   const current = useSessions((s) => s.current);
   const cwd = useSessions((s) => s.current ? s.byId[s.current]?.cwd : void 0);
-  return (0, import_jsx_runtime5.jsx)("div", {
+  return (0, import_jsx_runtime6.jsx)("div", {
     "data-wt-rail": true,
     style: {
       position: "absolute",
@@ -826,7 +1071,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
     },
     children: [
       // 收展按钮（面板左侧窄条）
-      (0, import_jsx_runtime5.jsx)("button", {
+      (0, import_jsx_runtime6.jsx)("button", {
         type: "button",
         "data-wt-toggle": true,
         "aria-label": open ? "\u6536\u8D77\u5DE5\u5177\u4FA7\u8FB9\u680F" : "\u5C55\u5F00\u5DE5\u5177\u4FA7\u8FB9\u680F",
@@ -847,7 +1092,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
         },
         children: open ? "\u25B8" : "\u25C2"
       }),
-      open && (0, import_jsx_runtime5.jsx)("div", {
+      open && (0, import_jsx_runtime6.jsx)("div", {
         "data-wt-panel": true,
         style: {
           width: 300,
@@ -859,7 +1104,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
           minHeight: 0
         },
         children: [
-          (0, import_jsx_runtime5.jsx)("div", {
+          (0, import_jsx_runtime6.jsx)("div", {
             "data-wt-tabs": true,
             style: {
               display: "flex",
@@ -867,7 +1112,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
               flexShrink: 0
             },
             children: TABS.map(
-              (t) => (0, import_jsx_runtime5.jsx)("button", {
+              (t) => (0, import_jsx_runtime6.jsx)("button", {
                 key: t.id,
                 type: "button",
                 onClick: () => setTab(t.id),
@@ -886,10 +1131,10 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
               })
             )
           }),
-          (0, import_jsx_runtime5.jsx)("div", {
+          (0, import_jsx_runtime6.jsx)("div", {
             "data-wt-tabpanel": true,
             style: { flex: 1, minHeight: 0, overflow: "auto", padding: "4px 0" },
-            children: tab === "sessions" ? (0, import_jsx_runtime5.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime5.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : (0, import_jsx_runtime5.jsx)(Changes, { cwd, sessionId: current, rpc })
+            children: tab === "sessions" ? (0, import_jsx_runtime6.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime6.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : (0, import_jsx_runtime6.jsx)(Changes, { cwd, sessionId: current, rpc })
           })
         ]
       })

@@ -2,6 +2,8 @@ import { jsx } from "react/jsx-runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { callRpc } from "../lib/rpc.js";
 import { parseEntries, visibleRows, fileGlyph, toggleExpanded } from "../lib/fs-tree.js";
+import { PreviewWindow } from "./preview-window.js";
+import { previewKind } from "../lib/preview.js";
 
 // 懒加载文件树：根 = 当前会话 cwd；key=cwd 由父组件控制 → 工作区切换重新挂载（状态清零）。
 // 行右键菜单：复制绝对路径 / 发送到对话框（相对路径追加到输入框末尾）。
@@ -9,6 +11,7 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
   const [nodes, setNodes] = useState(() => new Map());
   const [expanded, setExpanded] = useState(() => new Set());
   const [selected, setSelected] = useState(null); // rel
+  const [preview, setPreview] = useState(null); // {rel, name}
   const [menu, setMenu] = useState(null); // {x, y, rel, name, absolute, isDir}
   const panelRef = useRef(null);
   const menuRef = useRef(null);
@@ -155,7 +158,12 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
             "data-selected": selected === row.rel || undefined,
             onClick: () => {
               setSelected(row.rel);
-              if (row.isDir) toggle(row.rel);
+              if (row.isDir) {
+                toggle(row.rel);
+              } else {
+                const kind = previewKind(row.name);
+                if (kind) setPreview({ rel: row.rel, name: row.name });
+              }
             },
             onContextMenu: (ev) => openMenu(ev, row),
             onKeyDown: (ev) => {
@@ -232,6 +240,14 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
               children: "发送到对话框",
             }),
           ],
+        }),
+      preview &&
+        jsx(PreviewWindow, {
+          file: preview.rel,
+          cwd,
+          sessionId,
+          rpc,
+          onClose: () => setPreview(null),
         }),
     ],
   });
