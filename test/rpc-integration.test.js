@@ -65,16 +65,24 @@ test("fs.listDir: relPath 越界 → bad-request（assertInside 拦截）", asyn
   assert.equal(listCalled, false);
 });
 
-test("fs.listDir: 合法请求 → ok + entries（信封 + 条目）", async () => {
+test("fs.listDir: 合法请求 → ok + entries（FsTarget 契约：resolve 返回对象，opts.cwd 必须为字符串）", async () => {
   const { handler, sessions } = captureHandler({
-    resolve: async (p, o) => p === "/w" ? "root" : "target",
-    listDir: async () => [{ name: "a.txt", type: "file", target: "T1" }],
-    processPath: () => "/w/a.txt",
+    resolve: async (p, o) => {
+      // 复刻 dsh-fs-local resolve 契约：opts.cwd 必须是绝对路径字符串（否则 path.resolve 抛 ERR_INVALID_ARG_TYPE）
+      if (o?.cwd !== undefined && typeof o.cwd !== "string") {
+        throw new TypeError('The "paths[0]" argument must be of type string. Received an instance of Object');
+      }
+      const base = o?.cwd ?? "/w";
+      const abs = p.startsWith("/") ? p : `${base}/${p}`;
+      return { targetKey: abs, displayPath: abs };
+    },
+    listDir: async (t) => [{ name: "a.txt", type: "file", target: `${t.targetKey}/a.txt` }],
+    processPath: (t) => String(t.targetKey),
   });
   sessions.set("s1", { header: { cwd: "/w" } });
   const res = await handler("fs.listDir", { cwd: "/w", relPath: "sub", sessionId: "s1" });
   assert.equal(res.ok, true);
-  assert.deepEqual(res.value, { entries: [{ name: "a.txt", isDir: false, absolute: "/w/a.txt" }] });
+  assert.deepEqual(res.value, { entries: [{ name: "a.txt", isDir: false, absolute: "/w/sub/a.txt" }] });
 });
 
 test("fs.listDir: 未知 endpoint → bad-request", async () => {
