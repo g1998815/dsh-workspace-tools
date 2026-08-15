@@ -487,8 +487,9 @@ git commit -m "feat: M3 changes tab (grouped change list + unified diff view wit
 
 ## 里程碑验收清单（M3）
 
-- [ ] `node --test` 全绿（51 用例：44 + git-changes 7）。
-- [ ] harness curl `client.js` 含 `data-wt-changes`/`data-wt-diff`（serveBundle 实时读盘，**刷新浏览器即生效，无需重启**——M3 无 host 改动）。
+- [x] `node --test` 全绿（51 用例：44 + git-changes 7）。
+- [x] harness curl `client.js` 含 `data-wt-changes`（4）/`data-wt-diff`（5），HTTP 200（serveBundle 实时读盘，**刷新浏览器即生效，无需重启**——M3 无 host 改动）。
+- [x] 已推送 GitHub main（`cb147b8`）。
 - [ ] GUI 手动验收：
   - [ ] 变更页签：显示当前会话 cwd 的 git 变更列表（状态徽章 M/??/D、目录分组、根目录组）。
   - [ ] 点击目录行折叠/展开。
@@ -496,7 +497,12 @@ git commit -m "feat: M3 changes tab (grouped change list + unified diff view wit
   - [ ] "↻ 刷新"按钮重载列表。
   - [ ] 切换工作区后列表自动重载。
   - [ ] 无变更时显示"没有变更"。
-- [ ] 推送至 GitHub 私有仓库 main。
+
+## 完成记录（2026-08-15）
+
+- Task 1 接口定稿：`visibleRows` 的 file 行**不带 `dir`**（含 `status/untracked/path/base`）——brief 的 `{kind:"file", ...change}` 描述为此过时，组件按实际字段消费（Task 2 审查确认）。
+- Task 1 实现修正（brief 内部不一致，审查验证必要）：`visibleRows` 解构去掉 file 行的 `dir`；`parseDiff` 跳过 split 产生的尾部空行。
+- 已知 Minor（不阻塞）：diff 头部状态标签对已跟踪固定显示"修改"；cwd 切换时 in-flight RPC 无取消守卫（React 18 容忍）；无 cwd 时空态文案"没有变更"；超长 diff 行省略不滚动；diff 行以索引为 key。
 
 ## 后续（非 M3 范围）
 
