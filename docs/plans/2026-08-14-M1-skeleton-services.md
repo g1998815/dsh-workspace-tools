@@ -151,13 +151,18 @@ git commit -m "chore: scaffold dsh-workspace-tools package"
 **Interfaces:**
 - Produces: `npm run build` → `client.js`（esbuild 产物）；M2 起 src 由 React 组件填充。
 
-- [ ] **Step 1: 写空壳 src/index.js**
+- [ ] **Step 1: 写最小 client 插件 src/index.js**
 
 ```js
-// M1 空壳：client 端 UI 自 M2（文件浏览器）起填充。
-// 打包后必须自包含 classic script，并以 window.__ModuleLoader__.load({id, factory}) 收尾
-// （收尾由 build.mjs 的 footer 注入；M2 起本文件导出 { name, inject, apply }，factory 返回它）。
-export {};
+// M1 最小 client 插件：浏览器端（harness/web UI）经 __ModuleLoader__ 加载本 bundle，
+// factory 结果会被 cordis 按插件校验（isApplicable：object.apply 必须是 function）。
+// 空导出会让 unwrapExports 返回 { __esModule: true }（无 apply）→ "invalid plugin, received object"。
+// 因此 M1 即提供完整插件形状（命名导出 + default，与 host 端 lib/index.js 一致的双保险），
+// apply 为空实现占位；client UI 自 M2（文件浏览器）起填充。
+export const name = "dsh-workspace-tools";
+export const inject = [];
+export function apply(ctx) {}
+export default { name, inject, apply };
 ```
 
 - [ ] **Step 2: 写 build.mjs**
