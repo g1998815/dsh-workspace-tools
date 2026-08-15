@@ -64,3 +64,22 @@ test("resolvePath: returns normalized absolute path", () => {
   const root = join(tmpdir(), "dshwt", "root");
   assert.equal(resolvePath(root, "sub/a.txt").absolute, join(root, "sub", "a.txt"));
 });
+
+test("listDir: hides all dotfiles (unified policy, not just .git/.DS_Store)", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "dshwt-fs-"));
+  try {
+    writeFileSync(join(dir, ".env"), "SECRET=1");
+    writeFileSync(join(dir, ".vscode-settings"), "x");
+    writeFileSync(join(dir, "keep.txt"), "y");
+    const { entries } = await listDir(dir, "");
+    assert.deepEqual(entries.map((e) => e.name), ["keep.txt"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("isHidden: dotfile predicate", async () => {
+  const { isHidden } = await import("../lib/services/workspace-fs.js");
+  assert.equal(isHidden(".git"), true);
+  assert.equal(isHidden("a.txt"), false);
+});
