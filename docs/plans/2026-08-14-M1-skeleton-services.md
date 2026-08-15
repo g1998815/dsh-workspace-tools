@@ -780,7 +780,9 @@ import { listChanges, getDiff } from "./services/git-diff.js";
 import { resolvePath } from "./services/workspace-fs.js";
 import { createShellSession } from "./services/console.js";
 
-const RPC_CHANNEL = "/rpc/workspace-tools";
+// RPC channel 必须为单级路径（dsh-client-connection 的 CHANNEL_PATTERN = /^\/[A-Za-z0-9._~-]+$/，
+// 不含斜杠；"/api" 为保留字）。"/workspace-tools" 匹配。
+const RPC_CHANNEL = "/workspace-tools";
 const WS_PATH = "/plugins/dsh-workspace-tools/console";
 
 function translateFsError(err) {
@@ -956,7 +958,7 @@ Expected: 无语法错误（4 个文件全部通过 `node --check`）。
 
 按报告逐项落定：
 1. **inject 服务名**：`connection` / `webServer` / `fs` / `subprocess` 均为有效 host 服务名（dsh-client-connection / dsh-host-webserver / dsh-fs / dsh-subprocess）。**工作区服务名是 `ctx.workspaceRegistry`（不是 `workspace`）**——本 Task 不 inject 它（M1 RPC 的 `payload.cwd` 由 client 显式传入）；若后续加"cwd 必须属于当前 workspace"校验，用 `ctx.workspaceRegistry` + `ctx.sessions.get(id)?.header.cwd`（host 无"当前活动工作区"概念）。
-2. **RPC channel**：`/rpc/workspace-tools` 命名保留；client 面（M2 起）经 `ctx.connection` 直连 RPC，工作区/会话查询走 `ctx.connection.api.workspace.list({})` / `api.sessions.list({})`。
+2. **RPC channel**：`/workspace-tools`（单级路径，满足 `CHANNEL_PATTERN = /^\/[A-Za-z0-9._~-]+$/`；`/api` 为保留字不可用）；client 面（M2 起）经 `ctx.connection` 直连 RPC，工作区/会话查询走 `ctx.connection.api.workspace.list({})` / `api.sessions.list({})`。
 3. **cwd 来源（client 侧）**：`useSessions(s => s.byId[s.current]?.cwd)`（`SessionSummary.cwd`）+ `useWorkspaces` 监听工作区变化——M2 的 RPC `payload.cwd` 由此而来；host 服务签名显式传 cwd（本计划纯函数设计正确）。
 4. **dsh.client 字段**：已按报告写入 Task 1（`{ platform: "web", inject: [...] }`，无 entry/main，束路径走 `exports["./client"]`，产物以 `__ModuleLoader__.load` 收尾）——**无需再改**。
 
