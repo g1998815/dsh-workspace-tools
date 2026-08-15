@@ -353,9 +353,13 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
           key: c.hash,
           "data-wt-history-row": true,
           "data-selected": selCommit?.hash === c.hash || undefined,
+          title: "左键选中（回退）· 右键查看提交详情",
           onClick: () => {
             setSelCommit(c);
             setConfirmReset(false);
+          },
+          onContextMenu: (e) => {
+            e.preventDefault();
             setDetail({ hash: c.hash, shortHash: c.shortHash });
           },
           style: {

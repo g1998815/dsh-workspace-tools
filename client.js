@@ -1367,9 +1367,13 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
           key: c.hash,
           "data-wt-history-row": true,
           "data-selected": selCommit?.hash === c.hash || void 0,
+          title: "\u5DE6\u952E\u9009\u4E2D\uFF08\u56DE\u9000\uFF09\xB7 \u53F3\u952E\u67E5\u770B\u63D0\u4EA4\u8BE6\u60C5",
           onClick: () => {
             setSelCommit(c);
             setConfirmReset(false);
+          },
+          onContextMenu: (e) => {
+            e.preventDefault();
             setDetail({ hash: c.hash, shortHash: c.shortHash });
           },
           style: {
