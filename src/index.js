@@ -1,15 +1,41 @@
-// M1 最小 client 插件：浏览器端（harness/web UI）经 __ModuleLoader__ 加载本 bundle，
-// factory 结果会被 cordis 按插件校验（isApplicable：object.apply 必须是 function）。
-// 空导出会让 unwrapExports 返回 { __esModule: true }（无 apply）→ "invalid plugin, received object"。
-// 因此 M1 即提供完整插件形状（命名导出 + default，与 host 端 lib/index.js 一致的双保险），
-// apply 为空实现占位；client UI 自 M2（文件浏览器）起填充。
-export const name = "dsh-workspace-tools";
+// src/index.js —— client 插件入口（M2）
+// 注册进 sidebar.workspaces（kind:single / scope:root）：
+//   · priority: -1 遮蔽 shipped ui-workspace browser（单孔同 priority 重复注册会 throw，
+//     数字越小越先渲染 —— dsh-client-ui-slots register 实测）
+//   · root scope 拿不到 useInput/inputActions（session-scope 标准 prop）→ "发送到对话框"
+//     经 conversation 服务直连 shell：ctx.get("conversation").input.shell(sessionId)
+import { WorkspaceBrowser } from "./components/workspace-browser.js";
+import { composeDraftInsert } from "./lib/insert.js";
 
-// M1 空 apply 不需要任何服务；M2 起按需补充（slots / sessions / workspaces / locale 等）
-export const inject = [];
+export const name = "dsh-workspace-tools";
+export const inject = ["slots", "sessions", "connection"];
 
 export function apply(ctx) {
-  // M1 占位：client UI 自 M2 起挂载（sidebar.workspaces + priority:-1，见 M2 计划）。
+  ctx.slots.inject("sidebar.workspaces", () =>
+    ctx.slots.register(
+      {
+        name: "sidebar.workspaces",
+        priority: -1,
+        inject: () => ({
+          rpc: ctx.connection.rpc,
+          openSession: (id) => ctx.sessions.open(id),
+          insertIntoComposer: (sessionId, relPath) => {
+            const conversation = ctx.get("conversation");
+            if (!conversation) return false;
+            try {
+              const shell = conversation.input.shell(sessionId);
+              const { draft } = shell.state.getSnapshot();
+              shell.actions.setDraft(composeDraftInsert(draft, relPath));
+              return true;
+            } catch {
+              return false;
+            }
+          },
+        }),
+      },
+      WorkspaceBrowser,
+    ),
+  );
 }
 
 // 双保险：默认导出兼容按 default 解析的加载器（与 lib/index.js 同款）
