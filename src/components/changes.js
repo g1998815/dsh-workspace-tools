@@ -1,6 +1,7 @@
 // src/components/changes.js —— 变更页签 v2（M3c Task 3）
 // 分区：上半区=未提交变更（勾选多选 + 提交选中/全部 + 预览选中 + 分支 + 最近消息复用），
 //       下半区=提交历史（安全回退：二段确认 + 推送风险提示）；分隔条可拖拽调比例。
+// M3d Task 2：历史行点击打开提交详情浮窗（CommitDetailWindow：文件列表 + 单文件 diff）。
 // 保留 M3 能力：变更列表分组/折叠/单文件 diff 浮窗（与预览选中浮窗共用 DiffWindow）。
 import { jsx } from "react/jsx-runtime";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -8,6 +9,7 @@ import { callRpc } from "../lib/rpc.js";
 import { normalizeChanges, groupByDir, visibleRows, parseDiff } from "../lib/git-changes.js";
 import { relativeTime } from "../lib/git-history-client.js";
 import { DiffWindow } from "./diff-window.js";
+import { CommitDetailWindow } from "./commit-detail-window.js";
 
 const STATUS_COLOR = {
   M: "#e6b450",
@@ -49,6 +51,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
   const [histStatus, setHistStatus] = useState("loading"); // loading | ready | error
   const [histError, setHistError] = useState(null);
   const [selCommit, setSelCommit] = useState(null);
+  const [detail, setDetail] = useState(null); // {hash, shortHash} —— 提交详情浮窗
   const [confirmReset, setConfirmReset] = useState(false);
   const [splitPct, setSplitPct] = useState(50); // 上半区高度百分比
   const [previewLines, setPreviewLines] = useState(null); // 预览选中的拼接 diff
@@ -66,6 +69,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setError(null);
       setHistError(null);
       setSelCommit(null);
+      setDetail(null);
       setConfirmReset(false);
       setOpError(null);
       onCountChange?.(0);
@@ -98,6 +102,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
         setError(null);
         setHistStatus("ready");
         setSelCommit(null);
+        setDetail(null);
         setConfirmReset(false);
         onCountChange?.(changes.length);
       })
@@ -121,6 +126,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
     setCommitMsg("");
     setShowRecent(false);
     setSelCommit(null);
+    setDetail(null);
     setConfirmReset(false);
     load();
   }, [load]);
@@ -350,6 +356,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
           onClick: () => {
             setSelCommit(c);
             setConfirmReset(false);
+            setDetail({ hash: c.hash, shortHash: c.shortHash });
           },
           style: {
             padding: "4px 10px",
@@ -588,6 +595,13 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
   return jsx("div", {
     "data-wt-changes": true,
     style: { display: "flex", flexDirection: "column", height: "100%", minHeight: 0 },
-    children: [infoRow, upperPane, splitBar, lowerPane, diffWindow],
+    children: [infoRow, upperPane, splitBar, lowerPane, diffWindow, detail &&
+      jsx(CommitDetailWindow, {
+        target: detail.hash,
+        cwd,
+        sessionId,
+        rpc,
+        onClose: () => setDetail(null),
+      })],
   });
 }

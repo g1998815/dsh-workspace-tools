@@ -32,8 +32,8 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/components/workspace-browser.js
-var import_jsx_runtime7 = require("react/jsx-runtime");
-var import_react6 = require("react");
+var import_jsx_runtime9 = require("react/jsx-runtime");
+var import_react7 = require("react");
 
 // src/components/session-list.js
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -748,8 +748,8 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
 }
 
 // src/components/changes.js
-var import_jsx_runtime6 = require("react/jsx-runtime");
-var import_react5 = require("react");
+var import_jsx_runtime8 = require("react/jsx-runtime");
+var import_react6 = require("react");
 
 // src/lib/git-changes.js
 function normalizeChanges(raw) {
@@ -854,8 +854,55 @@ function relativeTime(iso, now = Date.now()) {
 }
 
 // src/components/diff-window.js
-var import_jsx_runtime5 = require("react/jsx-runtime");
+var import_jsx_runtime6 = require("react/jsx-runtime");
 var import_react4 = require("react");
+
+// src/components/diff-lines.js
+var import_jsx_runtime5 = require("react/jsx-runtime");
+function DiffLines({ lines, matches = [] }) {
+  return (0, import_jsx_runtime5.jsx)("div", {
+    "data-wt-diff": true,
+    style: { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "11px", paddingBottom: 8 },
+    children: lines.map((l, i) => {
+      let bg = "none";
+      let color = "var(--dsw-alias-text-primary, #ddd)";
+      if (l.kind === "add") {
+        bg = "rgba(126,198,153,0.15)";
+        color = "#7ec699";
+      } else if (l.kind === "del") {
+        bg = "rgba(224,108,117,0.15)";
+        color = "#e06c75";
+      } else if (l.kind === "hunk") {
+        bg = "rgba(97,175,239,0.12)";
+        color = "#61afef";
+      } else if (l.kind === "meta") {
+        color = "var(--dsw-alias-text-secondary, #999)";
+      }
+      const isMatch = matches.includes(i);
+      if (isMatch) {
+        bg = "rgba(230,180,80,0.28)";
+        color = "#f0d59a";
+      }
+      const oldCell = l.oldLine !== null ? String(l.oldLine) : " ";
+      const newCell = l.newLine !== null ? String(l.newLine) : " ";
+      return (0, import_jsx_runtime5.jsx)("div", {
+        key: i,
+        "data-line": i,
+        "data-wt-diff-line": true,
+        "data-kind": l.kind,
+        "data-wt-match": isMatch || void 0,
+        style: { display: "flex", background: bg, color, padding: "0 8px", whiteSpace: "pre" },
+        children: [
+          (0, import_jsx_runtime5.jsx)("span", { style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 4 }, children: oldCell }),
+          (0, import_jsx_runtime5.jsx)("span", { style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 8 }, children: newCell }),
+          (0, import_jsx_runtime5.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: l.text })
+        ]
+      });
+    })
+  });
+}
+
+// src/components/diff-window.js
 var WINDOW_W2 = 720;
 function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
   const [query, setQuery] = (0, import_react4.useState)("");
@@ -888,55 +935,19 @@ function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
   }, [matches.length]);
   let body;
   if (diffError) {
-    body = (0, import_jsx_runtime5.jsx)("div", { "data-wt-diff-error": true, style: { padding: 16, color: "#e06c75" }, children: diffError });
+    body = (0, import_jsx_runtime6.jsx)("div", { "data-wt-diff-error": true, style: { padding: 16, color: "#e06c75" }, children: diffError });
   } else if (!diffLines) {
-    body = (0, import_jsx_runtime5.jsx)("div", { "data-wt-diff-loading": true, style: { padding: 16, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D diff\u2026" });
+    body = (0, import_jsx_runtime6.jsx)("div", { "data-wt-diff-loading": true, style: { padding: 16, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D diff\u2026" });
   } else {
-    body = (0, import_jsx_runtime5.jsx)("div", {
+    body = (0, import_jsx_runtime6.jsx)("div", {
       ref: bodyRef,
-      "data-wt-diff": true,
-      style: { flex: 1, overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "11px", paddingBottom: 8 },
-      children: diffLines.map((l, i) => {
-        let bg = "none";
-        let color = "var(--dsw-alias-text-primary, #ddd)";
-        if (l.kind === "add") {
-          bg = "rgba(126,198,153,0.15)";
-          color = "#7ec699";
-        } else if (l.kind === "del") {
-          bg = "rgba(224,108,117,0.15)";
-          color = "#e06c75";
-        } else if (l.kind === "hunk") {
-          bg = "rgba(97,175,239,0.12)";
-          color = "#61afef";
-        } else if (l.kind === "meta") {
-          color = "var(--dsw-alias-text-secondary, #999)";
-        }
-        const isMatch = matches.includes(i);
-        if (isMatch) {
-          bg = "rgba(230,180,80,0.28)";
-          color = "#f0d59a";
-        }
-        const oldCell = l.oldLine !== null ? String(l.oldLine) : " ";
-        const newCell = l.newLine !== null ? String(l.newLine) : " ";
-        return (0, import_jsx_runtime5.jsx)("div", {
-          key: i,
-          "data-line": i,
-          "data-wt-diff-line": true,
-          "data-kind": l.kind,
-          "data-wt-match": isMatch || void 0,
-          style: { display: "flex", background: bg, color, padding: "0 8px", whiteSpace: "pre" },
-          children: [
-            (0, import_jsx_runtime5.jsx)("span", { style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 4 }, children: oldCell }),
-            (0, import_jsx_runtime5.jsx)("span", { style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 8 }, children: newCell }),
-            (0, import_jsx_runtime5.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: l.text })
-          ]
-        });
-      })
+      style: { flex: 1, overflow: "auto" },
+      children: (0, import_jsx_runtime6.jsx)(DiffLines, { lines: diffLines, matches })
     });
   }
   const hasQuery = query.trim() !== "";
   const count = matches.length ? `${Math.min(matchIdx + 1, matches.length)}/${matches.length}` : "0/0";
-  return (0, import_jsx_runtime5.jsx)(DraggableWindow, {
+  return (0, import_jsx_runtime6.jsx)(DraggableWindow, {
     wtPrefix: "diff",
     title: file,
     badge: statusLabel(untracked ? "??" : "M"),
@@ -958,8 +969,105 @@ function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
   });
 }
 
+// src/components/commit-detail-window.js
+var import_jsx_runtime7 = require("react/jsx-runtime");
+var import_react5 = require("react");
+var STATUS_COLOR = { A: "#7ec699", M: "#e6b450", D: "#e06c75", R: "#61afef", C: "#61afef" };
+function CommitDetailWindow({ target, cwd, sessionId, rpc, onClose }) {
+  const [files, setFiles] = (0, import_react5.useState)(null);
+  const [status, setStatus] = (0, import_react5.useState)("loading");
+  const [error, setError] = (0, import_react5.useState)(null);
+  const [sel, setSel] = (0, import_react5.useState)(null);
+  const [diffLines, setDiffLines] = (0, import_react5.useState)(null);
+  const [diffError, setDiffError] = (0, import_react5.useState)(null);
+  (0, import_react5.useEffect)(() => {
+    let cancelled = false;
+    setStatus("loading");
+    callRpc(rpc, "git.show", { cwd, sessionId, target }).then((value) => {
+      if (cancelled) return;
+      setFiles(value.files);
+      setStatus("ready");
+    }).catch((err) => {
+      if (cancelled) return;
+      setStatus("error");
+      setError(String(err?.message ?? err));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cwd, rpc, sessionId, target]);
+  const openFile = (0, import_react5.useCallback)(
+    (f) => {
+      setSel(f.path);
+      setDiffLines(null);
+      setDiffError(null);
+      callRpc(rpc, "git.showFile", { cwd, sessionId, target, file: f.path }).then((value) => setDiffLines(parseDiff(value.diff))).catch((err) => setDiffError(String(err?.message ?? err)));
+    },
+    [cwd, rpc, sessionId, target]
+  );
+  let body;
+  if (status === "loading") {
+    body = (0, import_jsx_runtime7.jsx)("div", { "data-wt-commit-detail-loading": true, style: { padding: 16, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
+  } else if (status === "error") {
+    body = (0, import_jsx_runtime7.jsx)("div", { "data-wt-commit-detail-error": true, style: { padding: 16, color: "#e06c75" }, children: error });
+  } else {
+    body = (0, import_jsx_runtime7.jsx)("div", {
+      style: { display: "flex", flexDirection: "column", height: "100%", minHeight: 0 },
+      children: [
+        // 文件列表（上半，可滚动）
+        (0, import_jsx_runtime7.jsx)("div", {
+          "data-wt-commit-files": true,
+          style: { flex: sel ? "0 0 35%" : 1, overflow: "auto", borderBottom: sel ? "1px solid var(--dsw-alias-border-l2, #333)" : "none" },
+          children: files.map(
+            (f) => (0, import_jsx_runtime7.jsx)("div", {
+              key: f.path,
+              role: "button",
+              "data-wt-commit-file": true,
+              "data-selected": sel === f.path || void 0,
+              onClick: () => openFile(f),
+              style: {
+                padding: "4px 10px",
+                cursor: "pointer",
+                display: "flex",
+                gap: 6,
+                alignItems: "center",
+                background: sel === f.path ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
+              },
+              children: [
+                (0, import_jsx_runtime7.jsx)("span", {
+                  style: {
+                    width: 20,
+                    textAlign: "center",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    flexShrink: 0,
+                    color: STATUS_COLOR[f.status] ?? "#ccc",
+                    border: `1px solid ${STATUS_COLOR[f.status] ?? "#ccc"}`,
+                    borderRadius: 3
+                  },
+                  children: f.status
+                }),
+                (0, import_jsx_runtime7.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: f.path })
+              ]
+            })
+          )
+        }),
+        // diff 视图（下半）
+        sel && (diffError ? (0, import_jsx_runtime7.jsx)("div", { "data-wt-commit-diff-error": true, style: { padding: 12, color: "#e06c75" }, children: diffError }) : !diffLines ? (0, import_jsx_runtime7.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D diff\u2026" }) : (0, import_jsx_runtime7.jsx)("div", { style: { flex: 1, overflow: "auto", minHeight: 0 }, children: (0, import_jsx_runtime7.jsx)(DiffLines, { lines: diffLines }) }))
+      ]
+    });
+  }
+  return (0, import_jsx_runtime7.jsx)(DraggableWindow, {
+    title: `${target} \u7684\u53D8\u66F4`,
+    badge: `${files ? files.length : "\u2026"} \u4E2A\u6587\u4EF6`,
+    width: 720,
+    onClose,
+    children: body
+  });
+}
+
 // src/components/changes.js
-var STATUS_COLOR = {
+var STATUS_COLOR2 = {
   M: "#e6b450",
   "??": "#9a9a9a",
   D: "#e06c75",
@@ -977,27 +1085,28 @@ var BTN2 = {
   flexShrink: 0
 };
 function Changes({ cwd, sessionId, rpc, onCountChange }) {
-  const [groups, setGroups] = (0, import_react5.useState)([]);
-  const [status, setStatus] = (0, import_react5.useState)("loading");
-  const [error, setError] = (0, import_react5.useState)(null);
-  const [collapsed, setCollapsed] = (0, import_react5.useState)(() => /* @__PURE__ */ new Set());
-  const [selected, setSelected] = (0, import_react5.useState)(null);
-  const [diffLines, setDiffLines] = (0, import_react5.useState)(null);
-  const [diffError, setDiffError] = (0, import_react5.useState)(null);
-  const [checked, setChecked] = (0, import_react5.useState)(() => /* @__PURE__ */ new Set());
-  const [commitMsg, setCommitMsg] = (0, import_react5.useState)("");
-  const [showRecent, setShowRecent] = (0, import_react5.useState)(false);
-  const [recentMessages, setRecentMessages] = (0, import_react5.useState)([]);
-  const [branch, setBranch] = (0, import_react5.useState)("");
-  const [commits, setCommits] = (0, import_react5.useState)([]);
-  const [histStatus, setHistStatus] = (0, import_react5.useState)("loading");
-  const [histError, setHistError] = (0, import_react5.useState)(null);
-  const [selCommit, setSelCommit] = (0, import_react5.useState)(null);
-  const [confirmReset, setConfirmReset] = (0, import_react5.useState)(false);
-  const [splitPct, setSplitPct] = (0, import_react5.useState)(50);
-  const [previewLines, setPreviewLines] = (0, import_react5.useState)(null);
-  const [opError, setOpError] = (0, import_react5.useState)(null);
-  const load = (0, import_react5.useCallback)(() => {
+  const [groups, setGroups] = (0, import_react6.useState)([]);
+  const [status, setStatus] = (0, import_react6.useState)("loading");
+  const [error, setError] = (0, import_react6.useState)(null);
+  const [collapsed, setCollapsed] = (0, import_react6.useState)(() => /* @__PURE__ */ new Set());
+  const [selected, setSelected] = (0, import_react6.useState)(null);
+  const [diffLines, setDiffLines] = (0, import_react6.useState)(null);
+  const [diffError, setDiffError] = (0, import_react6.useState)(null);
+  const [checked, setChecked] = (0, import_react6.useState)(() => /* @__PURE__ */ new Set());
+  const [commitMsg, setCommitMsg] = (0, import_react6.useState)("");
+  const [showRecent, setShowRecent] = (0, import_react6.useState)(false);
+  const [recentMessages, setRecentMessages] = (0, import_react6.useState)([]);
+  const [branch, setBranch] = (0, import_react6.useState)("");
+  const [commits, setCommits] = (0, import_react6.useState)([]);
+  const [histStatus, setHistStatus] = (0, import_react6.useState)("loading");
+  const [histError, setHistError] = (0, import_react6.useState)(null);
+  const [selCommit, setSelCommit] = (0, import_react6.useState)(null);
+  const [detail, setDetail] = (0, import_react6.useState)(null);
+  const [confirmReset, setConfirmReset] = (0, import_react6.useState)(false);
+  const [splitPct, setSplitPct] = (0, import_react6.useState)(50);
+  const [previewLines, setPreviewLines] = (0, import_react6.useState)(null);
+  const [opError, setOpError] = (0, import_react6.useState)(null);
+  const load = (0, import_react6.useCallback)(() => {
     if (!cwd) {
       setGroups([]);
       setCommits([]);
@@ -1008,6 +1117,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setError(null);
       setHistError(null);
       setSelCommit(null);
+      setDetail(null);
       setConfirmReset(false);
       setOpError(null);
       onCountChange?.(0);
@@ -1038,6 +1148,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setError(null);
       setHistStatus("ready");
       setSelCommit(null);
+      setDetail(null);
       setConfirmReset(false);
       onCountChange?.(changes.length);
     }).catch((err) => {
@@ -1048,7 +1159,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setHistError(msg);
     });
   }, [cwd, rpc, sessionId, onCountChange]);
-  (0, import_react5.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     setSelected(null);
     setDiffLines(null);
     setDiffError(null);
@@ -1058,10 +1169,11 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
     setCommitMsg("");
     setShowRecent(false);
     setSelCommit(null);
+    setDetail(null);
     setConfirmReset(false);
     load();
   }, [load]);
-  const openFile = (0, import_react5.useCallback)(
+  const openFile = (0, import_react6.useCallback)(
     (c) => {
       setSelected({ path: c.path, untracked: c.untracked });
       setDiffLines(null);
@@ -1070,7 +1182,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
     },
     [cwd, rpc, sessionId]
   );
-  const toggleDir = (0, import_react5.useCallback)((dir) => {
+  const toggleDir = (0, import_react6.useCallback)((dir) => {
     setCollapsed((prev) => {
       const next = new Set(prev);
       if (next.has(dir)) next.delete(dir);
@@ -1078,7 +1190,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       return next;
     });
   }, []);
-  const toggleChecked = (0, import_react5.useCallback)((path) => {
+  const toggleChecked = (0, import_react6.useCallback)((path) => {
     setChecked((prev) => {
       const next = new Set(prev);
       if (next.has(path)) next.delete(path);
@@ -1086,8 +1198,8 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       return next;
     });
   }, []);
-  const rows = (0, import_react5.useMemo)(() => visibleRows2(groups, collapsed), [groups, collapsed]);
-  const commitSelected = (0, import_react5.useCallback)(() => {
+  const rows = (0, import_react6.useMemo)(() => visibleRows2(groups, collapsed), [groups, collapsed]);
+  const commitSelected = (0, import_react6.useCallback)(() => {
     const files = [...checked];
     if (files.length === 0) return;
     setOpError(null);
@@ -1101,7 +1213,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setOpError(String(err?.message ?? err));
     });
   }, [cwd, rpc, sessionId, checked, commitMsg, load]);
-  const commitAll = (0, import_react5.useCallback)(() => {
+  const commitAll = (0, import_react6.useCallback)(() => {
     setOpError(null);
     callRpc(rpc, "git.commit", { cwd, sessionId, message: commitMsg.trim() }).then(() => {
       setChecked(/* @__PURE__ */ new Set());
@@ -1113,7 +1225,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setOpError(String(err?.message ?? err));
     });
   }, [cwd, rpc, sessionId, commitMsg, load]);
-  const previewSelected = (0, import_react5.useCallback)(() => {
+  const previewSelected = (0, import_react6.useCallback)(() => {
     const files = [...checked];
     if (files.length === 0) return;
     const meta = /* @__PURE__ */ new Map();
@@ -1134,7 +1246,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setPreviewLines(lines);
     });
   }, [checked, cwd, groups, rpc, sessionId]);
-  const doReset = (0, import_react5.useCallback)(() => {
+  const doReset = (0, import_react6.useCallback)(() => {
     if (!selCommit) return;
     if (!confirmReset) {
       setConfirmReset(true);
@@ -1151,7 +1263,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       setOpError(String(err?.message ?? err));
     });
   }, [cwd, rpc, sessionId, selCommit, confirmReset, load]);
-  const onSplitDown = (0, import_react5.useCallback)((e) => {
+  const onSplitDown = (0, import_react6.useCallback)((e) => {
     const el = e.currentTarget.parentElement;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -1169,16 +1281,16 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
   }, []);
   let list;
   if (status === "loading") {
-    list = (0, import_jsx_runtime6.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
+    list = (0, import_jsx_runtime8.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
   } else if (status === "error") {
-    list = (0, import_jsx_runtime6.jsx)("div", { "data-wt-error": true, style: { padding: 12, color: "#e06c75" }, children: error });
+    list = (0, import_jsx_runtime8.jsx)("div", { "data-wt-error": true, style: { padding: 12, color: "#e06c75" }, children: error });
   } else if (rows.length === 0) {
-    list = (0, import_jsx_runtime6.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u6CA1\u6709\u53D8\u66F4" });
+    list = (0, import_jsx_runtime8.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u6CA1\u6709\u53D8\u66F4" });
   } else {
-    list = (0, import_jsx_runtime6.jsx)("div", {
+    list = (0, import_jsx_runtime8.jsx)("div", {
       "data-wt-changes-list": true,
       children: rows.map(
-        (row) => row.kind === "dir" ? (0, import_jsx_runtime6.jsx)("div", {
+        (row) => row.kind === "dir" ? (0, import_jsx_runtime8.jsx)("div", {
           key: `dir-${row.dir}`,
           "data-wt-changes-dir": true,
           onClick: () => toggleDir(row.dir),
@@ -1192,11 +1304,11 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
             alignItems: "center"
           },
           children: [
-            (0, import_jsx_runtime6.jsx)("span", { children: collapsed.has(row.dir) ? "\u25B8" : "\u25BE" }),
-            (0, import_jsx_runtime6.jsx)("span", { children: row.dir === "" ? "\uFF08\u6839\u76EE\u5F55\uFF09" : row.dir }),
-            (0, import_jsx_runtime6.jsx)("span", { style: { opacity: 0.6 }, children: `${row.count}` })
+            (0, import_jsx_runtime8.jsx)("span", { children: collapsed.has(row.dir) ? "\u25B8" : "\u25BE" }),
+            (0, import_jsx_runtime8.jsx)("span", { children: row.dir === "" ? "\uFF08\u6839\u76EE\u5F55\uFF09" : row.dir }),
+            (0, import_jsx_runtime8.jsx)("span", { style: { opacity: 0.6 }, children: `${row.count}` })
           ]
-        }) : (0, import_jsx_runtime6.jsx)("div", {
+        }) : (0, import_jsx_runtime8.jsx)("div", {
           key: `file-${row.path}`,
           role: "button",
           "data-wt-changes-file": true,
@@ -1212,7 +1324,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
             background: selected?.path === row.path ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
           },
           children: [
-            (0, import_jsx_runtime6.jsx)("input", {
+            (0, import_jsx_runtime8.jsx)("input", {
               type: "checkbox",
               "data-wt-check": true,
               checked: checked.has(row.path),
@@ -1221,20 +1333,20 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
               // 勾选不触发行点击（打开 diff）
               style: { flexShrink: 0, margin: 0, accentColor: "var(--dsw-alias-accent, #4f8cff)" }
             }),
-            (0, import_jsx_runtime6.jsx)("span", {
+            (0, import_jsx_runtime8.jsx)("span", {
               style: {
                 width: 20,
                 textAlign: "center",
                 fontSize: "11px",
                 fontWeight: 700,
-                color: STATUS_COLOR[row.status] ?? "#ccc",
-                border: `1px solid ${STATUS_COLOR[row.status] ?? "#ccc"}`,
+                color: STATUS_COLOR2[row.status] ?? "#ccc",
+                border: `1px solid ${STATUS_COLOR2[row.status] ?? "#ccc"}`,
                 borderRadius: 3,
                 flexShrink: 0
               },
               children: row.status === "??" ? "?" : row.status
             }),
-            (0, import_jsx_runtime6.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: row.base })
+            (0, import_jsx_runtime8.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: row.base })
           ]
         })
       )
@@ -1242,22 +1354,23 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
   }
   let history;
   if (histStatus === "loading") {
-    history = (0, import_jsx_runtime6.jsx)("div", { style: { padding: 10, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u5386\u53F2\u2026" });
+    history = (0, import_jsx_runtime8.jsx)("div", { style: { padding: 10, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u5386\u53F2\u2026" });
   } else if (histStatus === "error") {
-    history = (0, import_jsx_runtime6.jsx)("div", { "data-wt-history-error": true, style: { padding: 10, color: "#e06c75" }, children: histError });
+    history = (0, import_jsx_runtime8.jsx)("div", { "data-wt-history-error": true, style: { padding: 10, color: "#e06c75" }, children: histError });
   } else if (commits.length === 0) {
-    history = (0, import_jsx_runtime6.jsx)("div", { style: { padding: 10, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u6CA1\u6709\u63D0\u4EA4\u8BB0\u5F55" });
+    history = (0, import_jsx_runtime8.jsx)("div", { style: { padding: 10, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u6CA1\u6709\u63D0\u4EA4\u8BB0\u5F55" });
   } else {
-    history = (0, import_jsx_runtime6.jsx)("div", {
+    history = (0, import_jsx_runtime8.jsx)("div", {
       "data-wt-history-list": true,
       children: commits.map(
-        (c) => (0, import_jsx_runtime6.jsx)("div", {
+        (c) => (0, import_jsx_runtime8.jsx)("div", {
           key: c.hash,
           "data-wt-history-row": true,
           "data-selected": selCommit?.hash === c.hash || void 0,
           onClick: () => {
             setSelCommit(c);
             setConfirmReset(false);
+            setDetail({ hash: c.hash, shortHash: c.shortHash });
           },
           style: {
             padding: "4px 10px",
@@ -1268,15 +1381,15 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
             background: selCommit?.hash === c.hash ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
           },
           children: [
-            (0, import_jsx_runtime6.jsx)("span", { style: { color: "#e6b450", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flexShrink: 0 }, children: c.shortHash }),
-            (0, import_jsx_runtime6.jsx)("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: c.subject }),
-            (0, import_jsx_runtime6.jsx)("span", { style: { flexShrink: 0, color: "var(--dsw-alias-text-secondary, #999)", fontSize: 11 }, children: relativeTime(c.date) })
+            (0, import_jsx_runtime8.jsx)("span", { style: { color: "#e6b450", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flexShrink: 0 }, children: c.shortHash }),
+            (0, import_jsx_runtime8.jsx)("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: c.subject }),
+            (0, import_jsx_runtime8.jsx)("span", { style: { flexShrink: 0, color: "var(--dsw-alias-text-secondary, #999)", fontSize: 11 }, children: relativeTime(c.date) })
           ]
         })
       )
     });
   }
-  const resetBar = selCommit ? (0, import_jsx_runtime6.jsx)("div", {
+  const resetBar = selCommit ? (0, import_jsx_runtime8.jsx)("div", {
     "data-wt-reset-bar": true,
     style: {
       padding: "6px 10px",
@@ -1288,7 +1401,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       background: "var(--dsw-alias-bg-base, #1a1a1a)"
     },
     children: [
-      (0, import_jsx_runtime6.jsx)("button", {
+      (0, import_jsx_runtime8.jsx)("button", {
         type: "button",
         "data-wt-reset": true,
         onClick: doReset,
@@ -1305,7 +1418,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
         },
         children: confirmReset ? "\u786E\u8BA4\u56DE\u9000\uFF1F" : `\u56DE\u9000\u5230 ${selCommit.shortHash}`
       }),
-      (0, import_jsx_runtime6.jsx)("div", {
+      (0, import_jsx_runtime8.jsx)("div", {
         "data-wt-reset-warn": true,
         style: { color: "#e6b450", fontSize: 11, lineHeight: 1.4 },
         children: "\u82E5\u8BE5\u63D0\u4EA4\u5DF2\u63A8\u9001\uFF0C\u56DE\u9000\u540E\u91CD\u65B0\u63A8\u9001\u9700 force"
@@ -1314,14 +1427,14 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
   }) : null;
   const n = checked.size;
   const msgEmpty = commitMsg.trim() === "";
-  const toolRow = (0, import_jsx_runtime6.jsx)("div", {
+  const toolRow = (0, import_jsx_runtime8.jsx)("div", {
     style: { position: "relative", flexShrink: 0 },
     children: [
-      (0, import_jsx_runtime6.jsx)("div", {
+      (0, import_jsx_runtime8.jsx)("div", {
         "data-wt-tools": true,
         style: { display: "flex", gap: 4, padding: "4px 6px", alignItems: "center", flexWrap: "wrap" },
         children: [
-          (0, import_jsx_runtime6.jsx)("input", {
+          (0, import_jsx_runtime8.jsx)("input", {
             type: "text",
             "data-wt-commit-msg": true,
             placeholder: "\u63D0\u4EA4\u6D88\u606F\u2026",
@@ -1339,7 +1452,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
               outline: "none"
             }
           }),
-          (0, import_jsx_runtime6.jsx)("button", {
+          (0, import_jsx_runtime8.jsx)("button", {
             type: "button",
             "data-wt-recent": true,
             title: "\u6700\u8FD1\u63D0\u4EA4\u6D88\u606F",
@@ -1347,7 +1460,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
             style: { ...BTN2, color: "var(--dsw-alias-text-secondary, #999)" },
             children: "\u25BE \u6700\u8FD1"
           }),
-          (0, import_jsx_runtime6.jsx)("button", {
+          (0, import_jsx_runtime8.jsx)("button", {
             type: "button",
             "data-wt-commit-selected": true,
             disabled: n === 0 || msgEmpty,
@@ -1355,7 +1468,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
             style: { ...BTN2, opacity: n === 0 || msgEmpty ? 0.45 : 1, cursor: n === 0 || msgEmpty ? "default" : "pointer" },
             children: `\u63D0\u4EA4\u9009\u4E2D(${n})`
           }),
-          (0, import_jsx_runtime6.jsx)("button", {
+          (0, import_jsx_runtime8.jsx)("button", {
             type: "button",
             "data-wt-commit-all": true,
             disabled: msgEmpty,
@@ -1363,7 +1476,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
             style: { ...BTN2, opacity: msgEmpty ? 0.45 : 1, cursor: msgEmpty ? "default" : "pointer" },
             children: "\u5168\u90E8\u63D0\u4EA4"
           }),
-          (0, import_jsx_runtime6.jsx)("button", {
+          (0, import_jsx_runtime8.jsx)("button", {
             type: "button",
             "data-wt-preview-selected": true,
             disabled: n === 0,
@@ -1373,7 +1486,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
           })
         ]
       }),
-      showRecent && (0, import_jsx_runtime6.jsx)("div", {
+      showRecent && (0, import_jsx_runtime8.jsx)("div", {
         "data-wt-recent-list": true,
         style: {
           position: "absolute",
@@ -1388,8 +1501,8 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
           maxHeight: 160,
           overflow: "auto"
         },
-        children: recentMessages.length === 0 ? (0, import_jsx_runtime6.jsx)("div", { style: { padding: "6px 10px", color: "var(--dsw-alias-text-secondary, #999)", fontSize: 12 }, children: "\uFF08\u6682\u65E0\u6700\u8FD1\u6D88\u606F\uFF09" }) : recentMessages.map(
-          (m, i) => (0, import_jsx_runtime6.jsx)("div", {
+        children: recentMessages.length === 0 ? (0, import_jsx_runtime8.jsx)("div", { style: { padding: "6px 10px", color: "var(--dsw-alias-text-secondary, #999)", fontSize: 12 }, children: "\uFF08\u6682\u65E0\u6700\u8FD1\u6D88\u606F\uFF09" }) : recentMessages.map(
+          (m, i) => (0, import_jsx_runtime8.jsx)("div", {
             key: i,
             "data-wt-recent-item": true,
             onClick: () => {
@@ -1411,12 +1524,12 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       })
     ]
   });
-  const infoRow = (0, import_jsx_runtime6.jsx)("div", {
+  const infoRow = (0, import_jsx_runtime8.jsx)("div", {
     "data-wt-info": true,
     style: { display: "flex", alignItems: "center", gap: 6, padding: "2px 6px", flexShrink: 0, color: "var(--dsw-alias-text-secondary, #999)", fontSize: 12 },
     children: [
-      (0, import_jsx_runtime6.jsx)("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: `\u{1F4CC} ${branch || "detached"}` }),
-      (0, import_jsx_runtime6.jsx)("button", {
+      (0, import_jsx_runtime8.jsx)("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: `\u{1F4CC} ${branch || "detached"}` }),
+      (0, import_jsx_runtime8.jsx)("button", {
         type: "button",
         "data-wt-refresh": true,
         onClick: load,
@@ -1425,26 +1538,26 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       })
     ]
   });
-  const upperPane = (0, import_jsx_runtime6.jsx)("div", {
+  const upperPane = (0, import_jsx_runtime8.jsx)("div", {
     "data-wt-upper": true,
     style: { height: `${splitPct}%`, minHeight: 0, flexShrink: 0, display: "flex", flexDirection: "column" },
     children: [
       toolRow,
-      opError && (0, import_jsx_runtime6.jsx)("div", {
+      opError && (0, import_jsx_runtime8.jsx)("div", {
         "data-wt-op-error": true,
         style: { padding: "4px 8px", color: "#e06c75", fontSize: 12, flexShrink: 0, background: "rgba(224,108,117,0.08)" },
         children: opError
       }),
-      (0, import_jsx_runtime6.jsx)("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: list })
+      (0, import_jsx_runtime8.jsx)("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: list })
     ]
   });
-  const splitBar = (0, import_jsx_runtime6.jsx)("div", {
+  const splitBar = (0, import_jsx_runtime8.jsx)("div", {
     "data-wt-split": true,
     onMouseDown: onSplitDown,
     title: "\u62D6\u62FD\u8C03\u6574\u4E0A\u4E0B\u6BD4\u4F8B",
     style: { height: 5, flexShrink: 0, cursor: "row-resize", background: "var(--dsw-alias-border-l2, #333)" }
   });
-  const lowerPane = (0, import_jsx_runtime6.jsx)("div", {
+  const lowerPane = (0, import_jsx_runtime8.jsx)("div", {
     "data-wt-history": true,
     style: {
       flex: 1,
@@ -1454,12 +1567,12 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       flexDirection: "column",
       borderTop: "1px solid var(--dsw-alias-border-l2, #333)"
     },
-    children: [(0, import_jsx_runtime6.jsx)("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: history }), resetBar]
+    children: [(0, import_jsx_runtime8.jsx)("div", { style: { flex: 1, minHeight: 0, overflow: "auto" }, children: history }), resetBar]
   });
   let diffWindow = null;
   if (selected) {
     const isPreview = !!selected.preview;
-    diffWindow = (0, import_jsx_runtime6.jsx)(DiffWindow, {
+    diffWindow = (0, import_jsx_runtime8.jsx)(DiffWindow, {
       file: selected.path,
       untracked: selected.untracked,
       diffLines: isPreview ? previewLines : diffLines,
@@ -1472,10 +1585,16 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       }
     });
   }
-  return (0, import_jsx_runtime6.jsx)("div", {
+  return (0, import_jsx_runtime8.jsx)("div", {
     "data-wt-changes": true,
     style: { display: "flex", flexDirection: "column", height: "100%", minHeight: 0 },
-    children: [infoRow, upperPane, splitBar, lowerPane, diffWindow]
+    children: [infoRow, upperPane, splitBar, lowerPane, diffWindow, detail && (0, import_jsx_runtime8.jsx)(CommitDetailWindow, {
+      target: detail.hash,
+      cwd,
+      sessionId,
+      rpc,
+      onClose: () => setDetail(null)
+    })]
   });
 }
 
@@ -1486,13 +1605,13 @@ var TABS = [
   { id: "sessions", label: "\u4F1A\u8BDD" }
 ];
 function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
-  const [open, setOpen] = (0, import_react6.useState)(true);
-  const [tab, setTab] = (0, import_react6.useState)("files");
-  const [railW, setRailW] = (0, import_react6.useState)(300);
-  const [changeCount, setChangeCount] = (0, import_react6.useState)(0);
+  const [open, setOpen] = (0, import_react7.useState)(true);
+  const [tab, setTab] = (0, import_react7.useState)("files");
+  const [railW, setRailW] = (0, import_react7.useState)(300);
+  const [changeCount, setChangeCount] = (0, import_react7.useState)(0);
   const current = useSessions((s) => s.current);
   const cwd = useSessions((s) => s.current ? s.byId[s.current]?.cwd : void 0);
-  const onResizeDown = (0, import_react6.useCallback)((e) => {
+  const onResizeDown = (0, import_react7.useCallback)((e) => {
     const move = (ev) => setRailW(Math.min(600, Math.max(200, window.innerWidth - ev.clientX)));
     const up = () => {
       window.removeEventListener("mousemove", move);
@@ -1501,7 +1620,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   }, []);
-  return (0, import_jsx_runtime7.jsx)("div", {
+  return (0, import_jsx_runtime9.jsx)("div", {
     "data-wt-rail": true,
     style: {
       position: "absolute",
@@ -1517,7 +1636,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
     },
     children: [
       // 宽度拖拽把手（rail 首子元素）
-      (0, import_jsx_runtime7.jsx)("div", {
+      (0, import_jsx_runtime9.jsx)("div", {
         "data-wt-resize": true,
         onMouseDown: onResizeDown,
         title: "\u62D6\u62FD\u8C03\u6574\u5BBD\u5EA6",
@@ -1530,7 +1649,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
         }
       }),
       // 收展按钮（面板左侧窄条）
-      (0, import_jsx_runtime7.jsx)("button", {
+      (0, import_jsx_runtime9.jsx)("button", {
         type: "button",
         "data-wt-toggle": true,
         "aria-label": open ? "\u6536\u8D77\u5DE5\u5177\u4FA7\u8FB9\u680F" : "\u5C55\u5F00\u5DE5\u5177\u4FA7\u8FB9\u680F",
@@ -1551,7 +1670,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
         },
         children: open ? "\u25B8" : "\u25C2"
       }),
-      open && (0, import_jsx_runtime7.jsx)("div", {
+      open && (0, import_jsx_runtime9.jsx)("div", {
         "data-wt-panel": true,
         style: {
           flex: 1,
@@ -1564,7 +1683,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
           minHeight: 0
         },
         children: [
-          (0, import_jsx_runtime7.jsx)("div", {
+          (0, import_jsx_runtime9.jsx)("div", {
             "data-wt-tabs": true,
             style: {
               display: "flex",
@@ -1572,7 +1691,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
               flexShrink: 0
             },
             children: TABS.map(
-              (t) => (0, import_jsx_runtime7.jsx)("button", {
+              (t) => (0, import_jsx_runtime9.jsx)("button", {
                 key: t.id,
                 type: "button",
                 onClick: () => setTab(t.id),
@@ -1591,10 +1710,10 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
               })
             )
           }),
-          (0, import_jsx_runtime7.jsx)("div", {
+          (0, import_jsx_runtime9.jsx)("div", {
             "data-wt-tabpanel": true,
             style: { flex: 1, minHeight: 0, overflow: "auto", padding: "4px 0" },
-            children: tab === "sessions" ? (0, import_jsx_runtime7.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime7.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : (0, import_jsx_runtime7.jsx)(Changes, { cwd, sessionId: current, rpc, onCountChange: setChangeCount })
+            children: tab === "sessions" ? (0, import_jsx_runtime9.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime9.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : (0, import_jsx_runtime9.jsx)(Changes, { cwd, sessionId: current, rpc, onCountChange: setChangeCount })
           })
         ]
       })
