@@ -1427,7 +1427,8 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
       right: 0,
       top: 0,
       bottom: 0,
-      width: railW,
+      width: open ? railW : void 0,
+      // 收起时不占宽：rail 不留隐形拦截层，按钮贴右缘
       display: "flex",
       zIndex: 5,
       fontSize: "13px",
