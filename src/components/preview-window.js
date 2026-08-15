@@ -1,8 +1,13 @@
 // src/components/preview-window.js —— 文件预览浮窗（文本：等宽+搜索；图片：data URL）
+// M3c Task 2：复用 DraggableWindow（标题栏拖拽/关闭/搜索条），本组件保留
+// 加载逻辑、matches 计算与滚动定位（bodyRef 在子内容区）；搜索状态留在本组件。
+// 标记：data-wt-preview-window（根，由 DraggableWindow 渲染）、data-wt-preview-search、
+// data-wt-preview-prev/next/close、data-wt-preview-* 正文标记全部保留。
 import { jsx } from "react/jsx-runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { callRpc } from "../lib/rpc.js";
 import { previewKind } from "../lib/preview.js";
+import { DraggableWindow } from "./draggable-window.js";
 
 const WINDOW_W = 640;
 
@@ -10,10 +15,6 @@ const MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "im
 
 export function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
   const kind = previewKind(file);
-  const [pos, setPos] = useState(() => {
-    const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
-    return { x: Math.max(8, vw - WINDOW_W - 24), y: 64 };
-  });
   const [state, setState] = useState("loading"); // loading | ready | error
   const [error, setError] = useState(null);
   const [textLines, setTextLines] = useState(null);
@@ -21,7 +22,6 @@ export function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
   const [query, setQuery] = useState("");
   const [matchIdx, setMatchIdx] = useState(0);
   const bodyRef = useRef(null);
-  const dragRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,18 +76,6 @@ export function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
     bodyRef.current.querySelector(`[data-line="${idx}"]`)?.scrollIntoView({ block: "center" });
   }, [matchIdx, matches]);
 
-  const onTitleDown = useCallback(
-    (e) => {
-      if (e.target.closest("input,button")) return;
-      dragRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
-      const move = (ev) => setPos({ x: Math.max(0, ev.clientX - dragRef.current.dx), y: Math.max(0, ev.clientY - dragRef.current.dy) });
-      const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
-      window.addEventListener("mousemove", move);
-      window.addEventListener("mouseup", up);
-    },
-    [pos],
-  );
-
   const nextMatch = useCallback(() => { if (matches.length) setMatchIdx((i) => (i + 1) % matches.length); }, [matches.length]);
   const prevMatch = useCallback(() => { if (matches.length) setMatchIdx((i) => (i - 1 + matches.length) % matches.length); }, [matches.length]);
 
@@ -118,64 +106,28 @@ export function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
   }
 
   const hasQuery = query.trim() !== "";
+  const count = matches.length ? `${Math.min(matchIdx + 1, matches.length)}/${matches.length}` : "0/0";
 
-  return jsx("div", {
-    "data-wt-preview-window": true,
-    style: {
-      position: "fixed",
-      left: pos.x,
-      top: pos.y,
-      width: WINDOW_W,
-      maxWidth: "94vw",
-      height: "70vh",
-      minHeight: 240,
-      display: "flex",
-      flexDirection: "column",
-      background: "var(--dsw-alias-bg-base, #1a1a1a)",
-      border: "1px solid var(--dsw-alias-border-l2, #333)",
-      borderRadius: 8,
-      boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-      zIndex: 100,
-      fontSize: 12,
-      overflow: "hidden",
-    },
-    children: [
-      jsx("div", {
-        "data-wt-preview-title": true,
-        onMouseDown: onTitleDown,
-        style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", cursor: "move", background: "var(--dsw-alias-bg-float, #1f1f1f)", borderBottom: "1px solid var(--dsw-alias-border-l2, #333)", flexShrink: 0, userSelect: "none" },
-        children: [
-          jsx("span", { style: { fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, children: file }),
-          jsx("span", { style: { fontSize: 10, padding: "1px 5px", border: "1px solid #888", borderRadius: 3, color: "#aaa", flexShrink: 0 }, children: kind ?? "" }),
-          kind === "text" && hasQuery && jsx("span", { "data-wt-preview-count": true, style: { color: "#e6b450", fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }, children: matches.length ? `${Math.min(matchIdx + 1, matches.length)}/${matches.length}` : "0/0" }),
-          jsx("button", {
-            type: "button",
-            "data-wt-preview-close": true,
-            onClick: onClose,
-            title: "关闭（Esc）",
-            style: { marginLeft: "auto", background: "none", border: "none", color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", fontSize: 14, padding: "0 4px", flexShrink: 0 },
-            children: "✕",
-          }),
-        ],
-      }),
-      kind === "text" &&
-        jsx("div", { style: { display: "flex", gap: 6, padding: "5px 10px", borderBottom: "1px solid var(--dsw-alias-border-l2, #333)", flexShrink: 0, alignItems: "center" }, children: [
-          jsx("input", {
-            "data-wt-preview-search": true,
-            type: "text",
-            placeholder: "搜索…",
-            value: query,
-            onChange: (e) => { setQuery(e.target.value); setMatchIdx(0); },
-            onKeyDown: (e) => {
-              if (e.key === "Enter") e.shiftKey ? prevMatch() : nextMatch();
-              if (e.key === "Escape") onClose();
-            },
-            style: { flex: 1, background: "var(--dsw-alias-bg-base, #141414)", border: "1px solid var(--dsw-alias-border-l2, #333)", borderRadius: 4, color: "var(--dsw-alias-text-primary, #ddd)", padding: "3px 8px", fontSize: 12, outline: "none" },
-          }),
-          hasQuery && jsx("button", { type: "button", "data-wt-preview-prev": true, onClick: prevMatch, style: { background: "none", border: "1px solid var(--dsw-alias-border-l2, #444)", borderRadius: 4, color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", padding: "1px 7px", fontSize: 11 }, children: "↑" }),
-          hasQuery && jsx("button", { type: "button", "data-wt-preview-next": true, onClick: nextMatch, style: { background: "none", border: "1px solid var(--dsw-alias-border-l2, #444)", borderRadius: 4, color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", padding: "1px 7px", fontSize: 11 }, children: "↓" }),
-        ] }),
-      body,
-    ],
+  return jsx(DraggableWindow, {
+    wtPrefix: "preview",
+    title: file,
+    badge: kind,
+    width: WINDOW_W,
+    onClose,
+    search: kind === "text"
+      ? {
+          value: query,
+          onChange: (v) => {
+            setQuery(v);
+            setMatchIdx(0);
+          },
+          onEnter: (e) => (e.shiftKey ? prevMatch() : nextMatch()),
+          onPrev: prevMatch,
+          onNext: nextMatch,
+          count,
+          active: hasQuery,
+        }
+      : undefined,
+    children: body,
   });
 }
