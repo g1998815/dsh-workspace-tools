@@ -464,10 +464,10 @@ test("fs-tree: visibleRows 展开顺序与深度（目录优先由 host 排序�
   assert.equal(rows[0].depth, 0);
   // 展开 src：src 目录下 children 出现（deep 处于 loading，不展开）
   rows = visibleRows(nodes, new Set(["src"]));
-  assert.deepEqual(rows.map((r) => `${r.depth}:${r.rel}`), ["0:a.txt", "0:src", "1:b.js", "1:deep"]);
+  assert.deepEqual(rows.map((r) => `${r.depth}:${r.rel}`), ["0:a.txt", "0:src", "1:src/b.js", "1:src/deep"]);
   // 展开 src + src/deep：deep 未 ready，不展开
   rows = visibleRows(nodes, new Set(["src", "src/deep"]));
-  assert.deepEqual(rows.map((r) => r.rel), ["a.txt", "src", "b.js", "deep"]);
+  assert.deepEqual(rows.map((r) => r.rel), ["a.txt", "src", "src/b.js", "src/deep"]);
   // 根未加载：空
   assert.deepEqual(visibleRows(new Map(), new Set()), []);
 });
@@ -573,7 +573,7 @@ export function composeDraftInsert(draft, text) {
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `export PATH=/Users/onyh/.nvm/versions/node/v22.22.1/bin:$PATH && node --test test/client-logic.test.js`
-Expected: 12 个用例 PASS。
+Expected: 11 个用例 PASS。
 
 - [ ] **Step 5: Commit**
 
@@ -1005,7 +1005,7 @@ Expected: 均 ≥1（组件标记、slot 名、priority、ModuleLoader 收尾都
 - [ ] **Step 4: 全量单测**
 
 Run: `export PATH=/Users/onyh/.nvm/versions/node/v22.22.1/bin:$PATH && node --test`
-Expected: 全绿（rpc 5 + workspace-fs 8 + git-diff 7 + console 4 + client-logic 12 = 36）。
+Expected: 全绿（rpc 5 + workspace-fs 8 + git-diff 7 + console 4 + client-logic 11 = 35）。
 
 - [ ] **Step 5: Commit**
 
