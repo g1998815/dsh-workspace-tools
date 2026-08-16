@@ -1,15 +1,18 @@
 // src/components/session-changes.js —— "会话变更"页签（M6 Task 2）
 // 与 git 完全解耦：本组件只调 sessionChanges.* RPC（lib/index.js 的 guardCwd 端点）。
-// 结构：上方待处理区（按 turn 分组："对话 #N" + 文件条数；每条可展开 before/after
-// 双栏 diff；逐条 采用/撤回，成功后本地移除 + onCountChange 回调）；
+// 结构：上方待处理区（按 turn 分组："对话 #N" + 文件条数；点击行打开 git 同款
+// diff 弹窗 —— DiffWindow 壳 + DiffLines 渲染 before→after（diff-text.js 行级 diff，
+// 与 git parseDiff 同形状）；逐条 采用/撤回，成功后本地移除 + onCountChange 回调）；
 // 下方已处理历史区（分隔线以下：按 turn 分组 ≤10 对话、最近在上，action 徽标
 // 已采用/已撤回 + 文件名 + handledAt 时间；清除按钮清空）。
 // 操作失败（如 revert 文件写回失败）：组件内联错误提示，记录保留可重试。
-// 标记：data-wt-sesschg / -turn / -item / -adopt / -revert / -diff / -history / -clear
+// 标记：data-wt-sesschg / -turn / -item / -adopt / -revert / -history / -clear
 import { jsx } from "react/jsx-runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { callRpc } from "../lib/rpc.js";
 import { relativeTime } from "../lib/git-history-client.js";
+import { diffText } from "../lib/diff-text.js";
+import { DiffWindow } from "./diff-window.js";
 
 // 工具徽标配色（与 changes.js 状态色同风格）
 const TOOL_COLOR = { write: "#61afef", edit: "#c678dd" };
@@ -25,8 +28,6 @@ const BTN = {
   fontSize: 12,
   flexShrink: 0,
 };
-
-const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
 
 // 路径拆分为 目录前缀（次要色）+ 文件名（主色）—— file-tree 风格
 function splitPath(file) {
@@ -53,50 +54,11 @@ function ToolBadge({ tool }) {
   });
 }
 
-// 展开态 before/after 双栏对比（简单两栏 pre，不引入 diff 算法）
-function DiffPane({ rec }) {
-  const beforeText = rec.before === null ? "（新增文件，原本不存在）" : rec.before;
-  const afterText = rec.after === null ? "（写入后读取失败）" : rec.after;
-  const colStyle = {
-    flex: 1,
-    minWidth: 0,
-    display: "flex",
-    flexDirection: "column",
-    gap: 2,
-  };
-  const headStyle = {
-    fontSize: 11,
-    color: "var(--dsw-alias-label-secondary, #666)",
-    flexShrink: 0,
-  };
-  const preStyle = {
-    margin: 0,
-    padding: "6px 8px",
-    background: "var(--dsw-alias-bg-overlay, #ffffff)",
-    border: "1px solid var(--dsw-alias-border-l2, #333)",
-    borderRadius: 4,
-    fontSize: 11,
-    lineHeight: 1.5,
-    whiteSpace: "pre-wrap",
-    wordBreak: "break-all",
-    maxHeight: 240,
-    overflow: "auto",
-    fontFamily: MONO,
-  };
-  return jsx("div", {
-    "data-wt-sesschg-diff": true,
-    style: { display: "flex", gap: 8, padding: "2px 10px 8px 34px" },
-    children: [
-      jsx("div", { style: colStyle, children: [jsx("div", { style: headStyle, children: "Before" }), jsx("pre", { style: preStyle, children: beforeText })] }),
-      jsx("div", { style: colStyle, children: [jsx("div", { style: headStyle, children: "After" }), jsx("pre", { style: preStyle, children: afterText })] }),
-    ],
-  });
-}
-
-// 待处理单条：展开开关 + 工具徽标 + 路径（目录前缀次要色）+ 时间 + 采用/撤回
-function PendingItem({ rec, expanded, busy, onToggle, onAdopt, onRevert }) {
+// 待处理单条：工具徽标 + 路径（目录前缀次要色）+ 时间 + 采用/撤回。
+// 点击整行打开 git 同款 diff 弹窗（DiffWindow/DiffLines 渲染 before→after 差异）——
+// 与「变更」页签点击文件打开的弹窗及其中 diff 文本格式完全一致。
+function PendingItem({ rec, busy, onView, onAdopt, onRevert }) {
   const { dir, base } = splitPath(rec.file);
-  const open = expanded.has(rec.callId);
   const opBusy = busy.has(rec.callId);
   const btnStyle = { ...BTN, opacity: opBusy ? 0.45 : 1, cursor: opBusy ? "default" : "pointer" };
   return jsx("div", {
@@ -105,11 +67,12 @@ function PendingItem({ rec, expanded, busy, onToggle, onAdopt, onRevert }) {
       jsx("div", {
         role: "button",
         tabIndex: 0,
-        onClick: () => onToggle(rec.callId),
+        title: "点击查看变更",
+        onClick: () => onView(rec),
         onKeyDown: (ev) => {
           if (ev.key === "Enter") {
             ev.preventDefault();
-            onToggle(rec.callId);
+            onView(rec);
           }
         },
         style: {
@@ -121,7 +84,7 @@ function PendingItem({ rec, expanded, busy, onToggle, onAdopt, onRevert }) {
           minHeight: 24,
         },
         children: [
-          jsx("span", { style: { width: 12, flexShrink: 0, display: "inline-block", textAlign: "center", fontSize: 10 }, children: open ? "▾" : "▸" }),
+          jsx("span", { style: { width: 12, flexShrink: 0, display: "inline-block", textAlign: "center", fontSize: 10 }, children: "▸" }),
           jsx(ToolBadge, { tool: rec.tool }),
           jsx("span", {
             style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", minWidth: 0 },
@@ -156,7 +119,6 @@ function PendingItem({ rec, expanded, busy, onToggle, onAdopt, onRevert }) {
           }),
         ],
       }),
-      open && jsx(DiffPane, { rec }),
     ],
   });
 }
@@ -223,7 +185,7 @@ export function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
   const [error, setError] = useState(null);
   const [items, setItems] = useState([]); // 待处理 Records（(turn,step) 升序，host 保证）
   const [historyItems, setHistoryItems] = useState([]); // [{rec, action, handledAt}]（handledAt 降序）
-  const [expanded, setExpanded] = useState(() => new Set()); // 展开 diff 的 callId
+  const [viewRec, setViewRec] = useState(null); // 打开 diff 弹窗的 rec
   const [busy, setBusy] = useState(() => new Set()); // 操作中的 callId
   const [clearing, setClearing] = useState(false);
   const [opError, setOpError] = useState(null); // 操作失败内联提示（不影响列表加载态）
@@ -301,14 +263,9 @@ export function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
     return order.map((turn) => [turn, byTurn.get(turn)]);
   }, [historyItems]);
 
-  const toggleExpanded = useCallback((callId) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(callId)) next.delete(callId);
-      else next.add(callId);
-      return next;
-    });
-  }, []);
+  // 打开/关闭 diff 弹窗（git 变更页签同款：点击行打开，Esc/✕ 关闭）
+  const openView = useCallback((rec) => setViewRec(rec), []);
+  const closeView = useCallback(() => setViewRec(null), []);
 
   // 本地移除一条 + 更新计数（文件条数）
   const removeLocal = useCallback(
@@ -373,9 +330,8 @@ export function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
               jsx(PendingItem, {
                 key: rec.callId,
                 rec,
-                expanded,
                 busy,
-                onToggle: toggleExpanded,
+                onView: openView,
                 onAdopt,
                 onRevert,
               }),
@@ -454,6 +410,15 @@ export function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
         }),
       jsx("div", { style: { flex: 1, minHeight: 0 }, children: pendingSection }),
       historySection,
+      // diff 弹窗（M6 改版：与 git 变更页签一致 —— 点击行打开，DiffLines 渲染文本）
+      viewRec &&
+        jsx(DiffWindow, {
+          key: viewRec.callId,
+          file: viewRec.file,
+          badge: viewRec.tool,
+          diffLines: diffText(viewRec.before, viewRec.after),
+          onClose: closeView,
+        }),
     ],
   });
 }

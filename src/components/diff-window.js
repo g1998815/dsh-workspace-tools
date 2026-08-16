@@ -13,7 +13,7 @@ import { DiffLines } from "./diff-lines.js";
 
 const WINDOW_W = 1080; // M5：原 720 × 1.5（用户需求：默认宽度为原来的 1.5 倍）
 
-export function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
+export function DiffWindow({ file, untracked, diffLines, diffError, onClose, badge }) {
   const [query, setQuery] = useState("");
   const [matchIdx, setMatchIdx] = useState(0);
   const bodyRef = useRef(null);
@@ -69,7 +69,7 @@ export function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
   return jsx(DraggableWindow, {
     wtPrefix: "diff",
     title: file,
-    badge: statusLabel(untracked ? "??" : "M"),
+    badge: badge ?? statusLabel(untracked ? "??" : "M"),
     width: WINDOW_W,
     onClose,
     search: {

@@ -1088,7 +1088,7 @@ function DiffLines({ lines, matches = [] }) {
 
 // src/components/diff-window.js
 var WINDOW_W2 = 1080;
-function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
+function DiffWindow({ file, untracked, diffLines, diffError, onClose, badge }) {
   const [query, setQuery] = (0, import_react4.useState)("");
   const [matchIdx, setMatchIdx] = (0, import_react4.useState)(0);
   const bodyRef = (0, import_react4.useRef)(null);
@@ -1134,7 +1134,7 @@ function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
   return (0, import_jsx_runtime6.jsx)(DraggableWindow, {
     wtPrefix: "diff",
     title: file,
-    badge: statusLabel(untracked ? "??" : "M"),
+    badge: badge ?? statusLabel(untracked ? "??" : "M"),
     width: WINDOW_W2,
     onClose,
     search: {
@@ -1849,6 +1849,55 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
 // src/components/session-changes.js
 var import_jsx_runtime9 = require("react/jsx-runtime");
 var import_react7 = require("react");
+
+// src/lib/diff-text.js
+function lcsTable(before, after) {
+  const n = before.length;
+  const m = after.length;
+  const dp = new Array(n + 1);
+  for (let i = 0; i <= n; i++) dp[i] = new Array(m + 1).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j2 = m - 1; j2 >= 0; j2--) {
+      if (before[i] === after[j2]) dp[i][j2] = dp[i + 1][j2 + 1] + 1;
+      else dp[i][j2] = Math.max(dp[i + 1][j2], dp[i][j2 + 1]);
+    }
+  }
+  return dp;
+}
+function splitLines(text) {
+  if (text === null) return [];
+  const lines = String(text).split("\n");
+  if (lines.length && lines[lines.length - 1] === "") lines.pop();
+  return lines;
+}
+function diffText(before, after) {
+  const oldL = splitLines(before);
+  const newL = splitLines(after);
+  const dp = lcsTable(oldL, newL);
+  const n = oldL.length;
+  const m = newL.length;
+  const out = [];
+  let oldNum = 1;
+  let newNum = 1;
+  let i = 0;
+  let j2 = 0;
+  while (i < n || j2 < m) {
+    if (i < n && j2 < m && oldL[i] === newL[j2]) {
+      out.push({ kind: "ctx", text: " " + oldL[i], oldLine: oldNum++, newLine: newNum++ });
+      i++;
+      j2++;
+    } else if (j2 < m && (i >= n || dp[i][j2 + 1] > dp[i + 1][j2])) {
+      out.push({ kind: "add", text: "+" + newL[j2], oldLine: null, newLine: newNum++ });
+      j2++;
+    } else {
+      out.push({ kind: "del", text: "-" + oldL[i], oldLine: oldNum++, newLine: null });
+      i++;
+    }
+  }
+  return out;
+}
+
+// src/components/session-changes.js
 var TOOL_COLOR = { write: "#61afef", edit: "#c678dd" };
 var BTN3 = {
   background: "var(--dsw-alias-bg-overlay, #ffffff)",
@@ -1860,7 +1909,6 @@ var BTN3 = {
   fontSize: 12,
   flexShrink: 0
 };
-var MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
 function splitPath(file) {
   const idx = file.lastIndexOf("/");
   if (idx === -1) return { dir: "", base: file };
@@ -1882,47 +1930,8 @@ function ToolBadge({ tool }) {
     children: tool
   });
 }
-function DiffPane({ rec }) {
-  const beforeText = rec.before === null ? "\uFF08\u65B0\u589E\u6587\u4EF6\uFF0C\u539F\u672C\u4E0D\u5B58\u5728\uFF09" : rec.before;
-  const afterText = rec.after === null ? "\uFF08\u5199\u5165\u540E\u8BFB\u53D6\u5931\u8D25\uFF09" : rec.after;
-  const colStyle = {
-    flex: 1,
-    minWidth: 0,
-    display: "flex",
-    flexDirection: "column",
-    gap: 2
-  };
-  const headStyle = {
-    fontSize: 11,
-    color: "var(--dsw-alias-label-secondary, #666)",
-    flexShrink: 0
-  };
-  const preStyle = {
-    margin: 0,
-    padding: "6px 8px",
-    background: "var(--dsw-alias-bg-overlay, #ffffff)",
-    border: "1px solid var(--dsw-alias-border-l2, #333)",
-    borderRadius: 4,
-    fontSize: 11,
-    lineHeight: 1.5,
-    whiteSpace: "pre-wrap",
-    wordBreak: "break-all",
-    maxHeight: 240,
-    overflow: "auto",
-    fontFamily: MONO
-  };
-  return (0, import_jsx_runtime9.jsx)("div", {
-    "data-wt-sesschg-diff": true,
-    style: { display: "flex", gap: 8, padding: "2px 10px 8px 34px" },
-    children: [
-      (0, import_jsx_runtime9.jsx)("div", { style: colStyle, children: [(0, import_jsx_runtime9.jsx)("div", { style: headStyle, children: "Before" }), (0, import_jsx_runtime9.jsx)("pre", { style: preStyle, children: beforeText })] }),
-      (0, import_jsx_runtime9.jsx)("div", { style: colStyle, children: [(0, import_jsx_runtime9.jsx)("div", { style: headStyle, children: "After" }), (0, import_jsx_runtime9.jsx)("pre", { style: preStyle, children: afterText })] })
-    ]
-  });
-}
-function PendingItem({ rec, expanded, busy, onToggle, onAdopt, onRevert }) {
+function PendingItem({ rec, busy, onView, onAdopt, onRevert }) {
   const { dir, base } = splitPath(rec.file);
-  const open = expanded.has(rec.callId);
   const opBusy = busy.has(rec.callId);
   const btnStyle = { ...BTN3, opacity: opBusy ? 0.45 : 1, cursor: opBusy ? "default" : "pointer" };
   return (0, import_jsx_runtime9.jsx)("div", {
@@ -1931,11 +1940,12 @@ function PendingItem({ rec, expanded, busy, onToggle, onAdopt, onRevert }) {
       (0, import_jsx_runtime9.jsx)("div", {
         role: "button",
         tabIndex: 0,
-        onClick: () => onToggle(rec.callId),
+        title: "\u70B9\u51FB\u67E5\u770B\u53D8\u66F4",
+        onClick: () => onView(rec),
         onKeyDown: (ev) => {
           if (ev.key === "Enter") {
             ev.preventDefault();
-            onToggle(rec.callId);
+            onView(rec);
           }
         },
         style: {
@@ -1947,7 +1957,7 @@ function PendingItem({ rec, expanded, busy, onToggle, onAdopt, onRevert }) {
           minHeight: 24
         },
         children: [
-          (0, import_jsx_runtime9.jsx)("span", { style: { width: 12, flexShrink: 0, display: "inline-block", textAlign: "center", fontSize: 10 }, children: open ? "\u25BE" : "\u25B8" }),
+          (0, import_jsx_runtime9.jsx)("span", { style: { width: 12, flexShrink: 0, display: "inline-block", textAlign: "center", fontSize: 10 }, children: "\u25B8" }),
           (0, import_jsx_runtime9.jsx)(ToolBadge, { tool: rec.tool }),
           (0, import_jsx_runtime9.jsx)("span", {
             style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", minWidth: 0 },
@@ -1981,8 +1991,7 @@ function PendingItem({ rec, expanded, busy, onToggle, onAdopt, onRevert }) {
             children: "\u64A4\u56DE"
           })
         ]
-      }),
-      open && (0, import_jsx_runtime9.jsx)(DiffPane, { rec })
+      })
     ]
   });
 }
@@ -2044,7 +2053,7 @@ function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
   const [error, setError] = (0, import_react7.useState)(null);
   const [items, setItems] = (0, import_react7.useState)([]);
   const [historyItems, setHistoryItems] = (0, import_react7.useState)([]);
-  const [expanded, setExpanded] = (0, import_react7.useState)(() => /* @__PURE__ */ new Set());
+  const [viewRec, setViewRec] = (0, import_react7.useState)(null);
   const [busy, setBusy] = (0, import_react7.useState)(() => /* @__PURE__ */ new Set());
   const [clearing, setClearing] = (0, import_react7.useState)(false);
   const [opError, setOpError] = (0, import_react7.useState)(null);
@@ -2106,14 +2115,8 @@ function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
     }
     return order.map((turn) => [turn, byTurn.get(turn)]);
   }, [historyItems]);
-  const toggleExpanded2 = (0, import_react7.useCallback)((callId) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(callId)) next.delete(callId);
-      else next.add(callId);
-      return next;
-    });
-  }, []);
+  const openView = (0, import_react7.useCallback)((rec) => setViewRec(rec), []);
+  const closeView = (0, import_react7.useCallback)(() => setViewRec(null), []);
   const removeLocal = (0, import_react7.useCallback)(
     (callId) => {
       const next = itemsRef.current.filter((r) => r.callId !== callId);
@@ -2165,9 +2168,8 @@ function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
               (rec) => (0, import_jsx_runtime9.jsx)(PendingItem, {
                 key: rec.callId,
                 rec,
-                expanded,
                 busy,
-                onToggle: toggleExpanded2,
+                onView: openView,
                 onAdopt,
                 onRevert
               })
@@ -2240,7 +2242,15 @@ function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
         children: opError
       }),
       (0, import_jsx_runtime9.jsx)("div", { style: { flex: 1, minHeight: 0 }, children: pendingSection }),
-      historySection
+      historySection,
+      // diff 弹窗（M6 改版：与 git 变更页签一致 —— 点击行打开，DiffLines 渲染文本）
+      viewRec && (0, import_jsx_runtime9.jsx)(DiffWindow, {
+        key: viewRec.callId,
+        file: viewRec.file,
+        badge: viewRec.tool,
+        diffLines: diffText(viewRec.before, viewRec.after),
+        onClose: closeView
+      })
     ]
   });
 }
@@ -12109,12 +12119,15 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
                   onClick: () => setTab(t.id),
                   "data-active": tab === t.id || void 0,
                   style: {
-                    flex: 1,
+                    flex: t.id === "sessionChanges" ? 1.7 : 1,
                     padding: "8px 4px",
                     background: "none",
                     border: "none",
                     cursor: "pointer",
                     fontSize: "12px",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
                     color: tab === t.id ? "var(--dsw-alias-label-primary, #1a1a1a)" : "var(--dsw-alias-label-secondary, #666)",
                     borderBottom: tab === t.id ? "2px solid var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6)" : "2px solid transparent"
                   },
