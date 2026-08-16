@@ -1995,17 +1995,28 @@ function PendingItem({ rec, busy, onView, onAdopt, onRevert }) {
     ]
   });
 }
-function HistoryItem({ entry }) {
+function HistoryItem({ entry, onView }) {
   const { dir, base } = splitPath(entry.rec.file);
   const adopted = entry.action === "adopted";
   const color = adopted ? "#7ec699" : "#e6b450";
   return (0, import_jsx_runtime9.jsx)("div", {
+    role: "button",
+    tabIndex: 0,
+    title: "\u70B9\u51FB\u67E5\u770B\u53D8\u66F4",
+    onClick: () => onView(entry.rec),
+    onKeyDown: (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        onView(entry.rec);
+      }
+    },
     style: {
       display: "flex",
       alignItems: "center",
       gap: 6,
       padding: "3px 10px",
-      minHeight: 24
+      minHeight: 24,
+      cursor: "pointer"
     },
     children: [
       (0, import_jsx_runtime9.jsx)("span", {
@@ -2033,7 +2044,7 @@ function HistoryItem({ entry }) {
     ]
   });
 }
-function TurnHeader({ turn, count }) {
+function TurnHeader({ turn, count, actions }) {
   return (0, import_jsx_runtime9.jsx)("div", {
     "data-wt-sesschg-turn": true,
     style: {
@@ -2045,7 +2056,11 @@ function TurnHeader({ turn, count }) {
       color: "var(--dsw-alias-label-secondary, #666)",
       fontSize: 12
     },
-    children: [(0, import_jsx_runtime9.jsx)("span", { children: `\u5BF9\u8BDD #${turn}` }), (0, import_jsx_runtime9.jsx)("span", { style: { opacity: 0.6, fontWeight: 400 }, children: `(${count})` })]
+    children: [
+      (0, import_jsx_runtime9.jsx)("span", { children: `\u5BF9\u8BDD #${turn}` }),
+      (0, import_jsx_runtime9.jsx)("span", { style: { opacity: 0.6, fontWeight: 400 }, children: `(${count})` }),
+      actions && (0, import_jsx_runtime9.jsx)("span", { style: { marginLeft: "auto", display: "flex", gap: 4, flexShrink: 0 }, children: actions })
+    ]
   });
 }
 function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
@@ -2145,6 +2160,38 @@ function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
   );
   const onAdopt = (0, import_react7.useCallback)((rec) => runOp(rec, "sessionChanges.adopt"), [runOp]);
   const onRevert = (0, import_react7.useCallback)((rec) => runOp(rec, "sessionChanges.revert"), [runOp]);
+  const removeLocalAll = (0, import_react7.useCallback)(
+    (ids) => {
+      const idSet = new Set(ids);
+      const next = itemsRef.current.filter((r) => !idSet.has(r.callId));
+      itemsRef.current = next;
+      setItems(next);
+      onCountChange?.(next.length);
+    },
+    [onCountChange]
+  );
+  const runTurnOp = (0, import_react7.useCallback)(
+    (turn, endpoint) => {
+      const recs = itemsRef.current.filter((r) => r.turn === turn);
+      if (recs.length === 0) return;
+      const ids = recs.map((r) => r.callId);
+      setOpError(null);
+      setBusy((prev) => /* @__PURE__ */ new Set([...prev, ...ids]));
+      Promise.all(recs.map((rec) => callRpc(rpc, endpoint, { cwd, sessionId, callId: rec.callId }))).then(() => {
+        removeLocalAll(ids);
+        return loadHistory();
+      }).catch((err) => setOpError(String(err?.message ?? err))).finally(() => {
+        setBusy((prev) => {
+          const next = new Set(prev);
+          for (const id of ids) next.delete(id);
+          return next;
+        });
+      });
+    },
+    [cwd, rpc, sessionId, removeLocalAll, loadHistory]
+  );
+  const onAdoptAll = (0, import_react7.useCallback)((turn) => runTurnOp(turn, "sessionChanges.adopt"), [runTurnOp]);
+  const onRevertAll = (0, import_react7.useCallback)((turn) => runTurnOp(turn, "sessionChanges.revert"), [runTurnOp]);
   const onClear = (0, import_react7.useCallback)(() => {
     setOpError(null);
     setClearing(true);
@@ -2159,11 +2206,36 @@ function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
     pendingSection = (0, import_jsx_runtime9.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u6CA1\u6709\u5F85\u5904\u7406\u7684\u4F1A\u8BDD\u53D8\u66F4" });
   } else {
     pendingSection = (0, import_jsx_runtime9.jsx)("div", {
-      children: pendingGroups.map(
-        ([turn, recs]) => (0, import_jsx_runtime9.jsx)("div", {
+      children: pendingGroups.map(([turn, recs]) => {
+        const anyBusy = recs.some((r) => busy.has(r.callId));
+        const groupBtn = { ...BTN3, opacity: anyBusy ? 0.45 : 1, cursor: anyBusy ? "default" : "pointer" };
+        return (0, import_jsx_runtime9.jsx)("div", {
           key: `p-${turn}`,
           children: [
-            (0, import_jsx_runtime9.jsx)(TurnHeader, { turn, count: recs.length }),
+            (0, import_jsx_runtime9.jsx)(TurnHeader, {
+              turn,
+              count: recs.length,
+              actions: [
+                (0, import_jsx_runtime9.jsx)("button", {
+                  type: "button",
+                  "data-wt-sesschg-adopt-all": true,
+                  disabled: anyBusy,
+                  title: "\u91C7\u7528\u8BE5\u5BF9\u8BDD\u7684\u5168\u90E8\u4FEE\u6539",
+                  onClick: () => onAdoptAll(turn),
+                  style: { ...groupBtn, color: "var(--dsw-alias-state-success-primary, #22c55e)", borderColor: "var(--dsw-alias-border-l2, #444)" },
+                  children: "\u5168\u90E8\u91C7\u7528"
+                }),
+                (0, import_jsx_runtime9.jsx)("button", {
+                  type: "button",
+                  "data-wt-sesschg-revert-all": true,
+                  disabled: anyBusy,
+                  title: "\u64A4\u56DE\u8BE5\u5BF9\u8BDD\u7684\u5168\u90E8\u4FEE\u6539",
+                  onClick: () => onRevertAll(turn),
+                  style: { ...groupBtn, color: "var(--dsw-alias-state-warn-primary, #f59e0b)", borderColor: "var(--dsw-alias-border-l2, #444)" },
+                  children: "\u5168\u90E8\u64A4\u56DE"
+                })
+              ]
+            }),
             recs.map(
               (rec) => (0, import_jsx_runtime9.jsx)(PendingItem, {
                 key: rec.callId,
@@ -2175,8 +2247,8 @@ function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
               })
             )
           ]
-        })
-      )
+        });
+      })
     });
   }
   const historySection = (0, import_jsx_runtime9.jsx)("div", {
@@ -2219,7 +2291,7 @@ function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
             key: `h-${turn}`,
             children: [
               (0, import_jsx_runtime9.jsx)(TurnHeader, { turn, count: entries.length }),
-              entries.map((entry) => (0, import_jsx_runtime9.jsx)(HistoryItem, { key: entry.rec.callId, entry }))
+              entries.map((entry) => (0, import_jsx_runtime9.jsx)(HistoryItem, { key: entry.rec.callId, entry, onView: openView }))
             ]
           })
         )

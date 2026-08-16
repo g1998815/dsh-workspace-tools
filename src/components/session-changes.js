@@ -1,12 +1,13 @@
-// src/components/session-changes.js —— "会话变更"页签（M6 Task 2）
+// src/components/session-changes.js —— "变更"页签（M6 Task 2）
 // 与 git 完全解耦：本组件只调 sessionChanges.* RPC（lib/index.js 的 guardCwd 端点）。
-// 结构：上方待处理区（按 turn 分组："对话 #N" + 文件条数；点击行打开 git 同款
-// diff 弹窗 —— DiffWindow 壳 + DiffLines 渲染 before→after（diff-text.js 行级 diff，
-// 与 git parseDiff 同形状）；逐条 采用/撤回，成功后本地移除 + onCountChange 回调）；
+// 结构：上方待处理区（按 turn 分组："对话 #N" + 文件条数；组头带 全部采用/全部撤回；
+// 点击单行打开 git 同款 diff 弹窗 —— DiffWindow 壳 + DiffLines 渲染 before→after
+// （diff-text.js 行级 diff，与 git parseDiff 同形状）；逐条 采用/撤回 或整组操作，
+// 成功后本地移除 + onCountChange 回调）；
 // 下方已处理历史区（分隔线以下：按 turn 分组 ≤10 对话、最近在上，action 徽标
-// 已采用/已撤回 + 文件名 + handledAt 时间；清除按钮清空）。
+// 已采用/已撤回 + 文件名 + handledAt 时间；点击行同样打开 diff 弹窗；清除按钮清空）。
 // 操作失败（如 revert 文件写回失败）：组件内联错误提示，记录保留可重试。
-// 标记：data-wt-sesschg / -turn / -item / -adopt / -revert / -history / -clear
+// 标记：data-wt-sesschg / -turn / -item / -adopt / -revert / -adopt-all / -revert-all / -history / -clear
 import { jsx } from "react/jsx-runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { callRpc } from "../lib/rpc.js";
@@ -123,18 +124,29 @@ function PendingItem({ rec, busy, onView, onAdopt, onRevert }) {
   });
 }
 
-// 已处理历史单条：action 徽标 + 路径 + handledAt 时间
-function HistoryItem({ entry }) {
+// 已处理历史单条：action 徽标 + 路径 + handledAt 时间；点击行打开 diff 弹窗（与待处理一致）
+function HistoryItem({ entry, onView }) {
   const { dir, base } = splitPath(entry.rec.file);
   const adopted = entry.action === "adopted";
   const color = adopted ? "#7ec699" : "#e6b450";
   return jsx("div", {
+    role: "button",
+    tabIndex: 0,
+    title: "点击查看变更",
+    onClick: () => onView(entry.rec),
+    onKeyDown: (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        onView(entry.rec);
+      }
+    },
     style: {
       display: "flex",
       alignItems: "center",
       gap: 6,
       padding: "3px 10px",
       minHeight: 24,
+      cursor: "pointer",
     },
     children: [
       jsx("span", {
@@ -163,8 +175,8 @@ function HistoryItem({ entry }) {
   });
 }
 
-// 对话组头："对话 #N" + 条数（待处理/历史共用）
-function TurnHeader({ turn, count }) {
+// 对话组头："对话 #N" + 条数（待处理/历史共用）；actions（如全部采用/全部撤回）渲染到行尾
+function TurnHeader({ turn, count, actions }) {
   return jsx("div", {
     "data-wt-sesschg-turn": true,
     style: {
@@ -176,7 +188,12 @@ function TurnHeader({ turn, count }) {
       color: "var(--dsw-alias-label-secondary, #666)",
       fontSize: 12,
     },
-    children: [jsx("span", { children: `对话 #${turn}` }), jsx("span", { style: { opacity: 0.6, fontWeight: 400 }, children: `(${count})` })],
+    children: [
+      jsx("span", { children: `对话 #${turn}` }),
+      jsx("span", { style: { opacity: 0.6, fontWeight: 400 }, children: `(${count})` }),
+      actions &&
+        jsx("span", { style: { marginLeft: "auto", display: "flex", gap: 4, flexShrink: 0 }, children: actions }),
+    ],
   });
 }
 
@@ -302,6 +319,46 @@ export function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
   const onAdopt = useCallback((rec) => runOp(rec, "sessionChanges.adopt"), [runOp]);
   const onRevert = useCallback((rec) => runOp(rec, "sessionChanges.revert"), [runOp]);
 
+  // 整组移除（全部采用/全部撤回成功后清掉该对话的 pending 记录）+ 更新计数
+  const removeLocalAll = useCallback(
+    (ids) => {
+      const idSet = new Set(ids);
+      const next = itemsRef.current.filter((r) => !idSet.has(r.callId));
+      itemsRef.current = next;
+      setItems(next);
+      onCountChange?.(next.length);
+    },
+    [onCountChange],
+  );
+
+  // 整组操作：该对话内各条按 callId 并发执行（host 端独立），全部成功才整组移除并刷历史
+  const runTurnOp = useCallback(
+    (turn, endpoint) => {
+      const recs = itemsRef.current.filter((r) => r.turn === turn);
+      if (recs.length === 0) return;
+      const ids = recs.map((r) => r.callId);
+      setOpError(null);
+      setBusy((prev) => new Set([...prev, ...ids]));
+      Promise.all(recs.map((rec) => callRpc(rpc, endpoint, { cwd, sessionId, callId: rec.callId })))
+        .then(() => {
+          removeLocalAll(ids);
+          return loadHistory();
+        })
+        .catch((err) => setOpError(String(err?.message ?? err)))
+        .finally(() => {
+          setBusy((prev) => {
+            const next = new Set(prev);
+            for (const id of ids) next.delete(id);
+            return next;
+          });
+        });
+    },
+    [cwd, rpc, sessionId, removeLocalAll, loadHistory],
+  );
+
+  const onAdoptAll = useCallback((turn) => runTurnOp(turn, "sessionChanges.adopt"), [runTurnOp]);
+  const onRevertAll = useCallback((turn) => runTurnOp(turn, "sessionChanges.revert"), [runTurnOp]);
+
   const onClear = useCallback(() => {
     setOpError(null);
     setClearing(true);
@@ -321,11 +378,36 @@ export function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
     pendingSection = jsx("div", { style: { padding: 12, color: "var(--dsw-alias-label-secondary, #666)" }, children: "没有待处理的会话变更" });
   } else {
     pendingSection = jsx("div", {
-      children: pendingGroups.map(([turn, recs]) =>
-        jsx("div", {
+      children: pendingGroups.map(([turn, recs]) => {
+        const anyBusy = recs.some((r) => busy.has(r.callId));
+        const groupBtn = { ...BTN, opacity: anyBusy ? 0.45 : 1, cursor: anyBusy ? "default" : "pointer" };
+        return jsx("div", {
           key: `p-${turn}`,
           children: [
-            jsx(TurnHeader, { turn, count: recs.length }),
+            jsx(TurnHeader, {
+              turn,
+              count: recs.length,
+              actions: [
+                jsx("button", {
+                  type: "button",
+                  "data-wt-sesschg-adopt-all": true,
+                  disabled: anyBusy,
+                  title: "采用该对话的全部修改",
+                  onClick: () => onAdoptAll(turn),
+                  style: { ...groupBtn, color: "var(--dsw-alias-state-success-primary, #22c55e)", borderColor: "var(--dsw-alias-border-l2, #444)" },
+                  children: "全部采用",
+                }),
+                jsx("button", {
+                  type: "button",
+                  "data-wt-sesschg-revert-all": true,
+                  disabled: anyBusy,
+                  title: "撤回该对话的全部修改",
+                  onClick: () => onRevertAll(turn),
+                  style: { ...groupBtn, color: "var(--dsw-alias-state-warn-primary, #f59e0b)", borderColor: "var(--dsw-alias-border-l2, #444)" },
+                  children: "全部撤回",
+                }),
+              ],
+            }),
             recs.map((rec) =>
               jsx(PendingItem, {
                 key: rec.callId,
@@ -337,8 +419,8 @@ export function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
               }),
             ),
           ],
-        }),
-      ),
+        });
+      }),
     });
   }
 
@@ -384,7 +466,7 @@ export function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
                 key: `h-${turn}`,
                 children: [
                   jsx(TurnHeader, { turn, count: entries.length }),
-                  entries.map((entry) => jsx(HistoryItem, { key: entry.rec.callId, entry })),
+                  entries.map((entry) => jsx(HistoryItem, { key: entry.rec.callId, entry, onView: openView })),
                 ],
               }),
             ),
