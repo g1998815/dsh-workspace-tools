@@ -1976,7 +1976,7 @@ function PendingItem({ rec, busy, onView, onAdopt, onRevert }) {
               ev.stopPropagation();
               onAdopt(rec);
             },
-            style: { ...btnStyle, color: "#2f855a", borderColor: "var(--dsw-alias-border-l2, #444)" },
+            style: { ...btnStyle, color: "var(--dsw-alias-state-success-primary, #22c55e)", borderColor: "var(--dsw-alias-border-l2, #444)" },
             children: "\u91C7\u7528"
           }),
           (0, import_jsx_runtime9.jsx)("button", {
@@ -1987,7 +1987,7 @@ function PendingItem({ rec, busy, onView, onAdopt, onRevert }) {
               ev.stopPropagation();
               onRevert(rec);
             },
-            style: { ...btnStyle, color: "#b7791f", borderColor: "var(--dsw-alias-border-l2, #444)" },
+            style: { ...btnStyle, color: "var(--dsw-alias-state-warn-primary, #f59e0b)", borderColor: "var(--dsw-alias-border-l2, #444)" },
             children: "\u64A4\u56DE"
           })
         ]
