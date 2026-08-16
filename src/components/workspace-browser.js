@@ -6,11 +6,11 @@ import { Changes } from "./changes.js";
 import { SessionChanges } from "./session-changes.js";
 import { ConsolePanel } from "./console.js";
 
-// 页签顺序（2026-08-15 用户定）：文件 → 变更 → 会话变更 → 会话（会话放最后）
+// 页签顺序（2026-08-16 用户定）：文件 → 变更(会话变更) → git(变更) → 会话（会话放最后）
 const TABS = [
   { id: "files", label: "文件" },
-  { id: "changes", label: "变更" },
-  { id: "sessionChanges", label: "会话变更" },
+  { id: "sessionChanges", label: "变更" },
+  { id: "changes", label: "git" },
   { id: "sessions", label: "会话" },
 ];
 
@@ -180,9 +180,9 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
                     },
                     children:
                       t.id === "changes" && changeCount > 0
-                        ? `变更 ${changeCount}`
+                        ? `git ${changeCount}`
                         : t.id === "sessionChanges" && sessionChangeCount > 0
-                          ? `会话变更 ${sessionChangeCount}`
+                          ? `变更 ${sessionChangeCount}`
                           : t.label,
                   }),
                 ),
@@ -257,7 +257,7 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
             jsx("button", {
               type: "button",
               "data-wt-icon": "changes",
-              title: "变更",
+              title: "git",
               onClick: () => iconTab("changes"),
               style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" },
               children: "🔀",
