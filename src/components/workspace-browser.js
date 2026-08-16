@@ -3,12 +3,14 @@ import { useCallback, useEffect, useState } from "react";
 import { SessionList } from "./session-list.js";
 import { FileTree } from "./file-tree.js";
 import { Changes } from "./changes.js";
+import { SessionChanges } from "./session-changes.js";
 import { ConsolePanel } from "./console.js";
 
-// 页签顺序（2026-08-15 用户定）：文件 → 变更 → 会话（会话放最后）
+// 页签顺序（2026-08-15 用户定）：文件 → 变更 → 会话变更 → 会话（会话放最后）
 const TABS = [
   { id: "files", label: "文件" },
   { id: "changes", label: "变更" },
+  { id: "sessionChanges", label: "会话变更" },
   { id: "sessions", label: "会话" },
 ];
 
@@ -39,6 +41,7 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
   const [tab, setTab] = useState("files");
   const [railW, setRailW] = useState(300);
   const [changeCount, setChangeCount] = useState(0);
+  const [sessionChangeCount, setSessionChangeCount] = useState(0);
   const [consoleOpen, setConsoleOpen] = useState(false);
   const current = useSessions((s) => s.current);
   const cwd = useSessions((s) => (s.current ? s.byId[s.current]?.cwd : undefined));
@@ -172,7 +175,12 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
                       color: tab === t.id ? "var(--dsw-alias-label-primary, #1a1a1a)" : "var(--dsw-alias-label-secondary, #666)",
                       borderBottom: tab === t.id ? "2px solid var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6)" : "2px solid transparent",
                     },
-                    children: t.id === "changes" && changeCount > 0 ? `变更 ${changeCount}` : t.label,
+                    children:
+                      t.id === "changes" && changeCount > 0
+                        ? `变更 ${changeCount}`
+                        : t.id === "sessionChanges" && sessionChangeCount > 0
+                          ? `会话变更 ${sessionChangeCount}`
+                          : t.label,
                   }),
                 ),
                 // 控制台开关（M4）：固定在页签条右端；面板本身 fixed 于底部
@@ -204,7 +212,9 @@ export function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer
                   ? jsx(SessionList, { useSessions, openSession })
                   : tab === "files"
                     ? jsx(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer })
-                    : jsx(Changes, { cwd, sessionId: current, rpc, onCountChange: setChangeCount }),
+                    : tab === "sessionChanges"
+                      ? jsx(SessionChanges, { cwd, sessionId: current, rpc, onCountChange: setSessionChangeCount })
+                      : jsx(Changes, { cwd, sessionId: current, rpc, onCountChange: setChangeCount }),
             }),
           ],
         }),

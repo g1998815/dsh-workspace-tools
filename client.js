@@ -32,8 +32,8 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/components/workspace-browser.js
-var import_jsx_runtime10 = require("react/jsx-runtime");
-var import_react8 = require("react");
+var import_jsx_runtime11 = require("react/jsx-runtime");
+var import_react9 = require("react");
 
 // src/components/session-list.js
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -1846,9 +1846,408 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
   });
 }
 
-// src/components/console.js
+// src/components/session-changes.js
 var import_jsx_runtime9 = require("react/jsx-runtime");
 var import_react7 = require("react");
+var TOOL_COLOR = { write: "#61afef", edit: "#c678dd" };
+var BTN3 = {
+  background: "var(--dsw-alias-bg-overlay, #ffffff)",
+  border: "1px solid var(--dsw-alias-border-l2, #444)",
+  borderRadius: 4,
+  color: "var(--dsw-alias-label-primary, #1a1a1a)",
+  cursor: "pointer",
+  padding: "2px 8px",
+  fontSize: 12,
+  flexShrink: 0
+};
+var MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
+function splitPath(file) {
+  const idx = file.lastIndexOf("/");
+  if (idx === -1) return { dir: "", base: file };
+  return { dir: file.slice(0, idx + 1), base: file.slice(idx + 1) };
+}
+function ToolBadge({ tool }) {
+  const color = TOOL_COLOR[tool] ?? "#9a9a9a";
+  return (0, import_jsx_runtime9.jsx)("span", {
+    style: {
+      width: 38,
+      textAlign: "center",
+      fontSize: 11,
+      fontWeight: 700,
+      color,
+      border: `1px solid ${color}`,
+      borderRadius: 3,
+      flexShrink: 0
+    },
+    children: tool
+  });
+}
+function DiffPane({ rec }) {
+  const beforeText = rec.before === null ? "\uFF08\u65B0\u589E\u6587\u4EF6\uFF0C\u539F\u672C\u4E0D\u5B58\u5728\uFF09" : rec.before;
+  const afterText = rec.after === null ? "\uFF08\u5199\u5165\u540E\u8BFB\u53D6\u5931\u8D25\uFF09" : rec.after;
+  const colStyle = {
+    flex: 1,
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: 2
+  };
+  const headStyle = {
+    fontSize: 11,
+    color: "var(--dsw-alias-label-secondary, #666)",
+    flexShrink: 0
+  };
+  const preStyle = {
+    margin: 0,
+    padding: "6px 8px",
+    background: "var(--dsw-alias-bg-overlay, #ffffff)",
+    border: "1px solid var(--dsw-alias-border-l2, #333)",
+    borderRadius: 4,
+    fontSize: 11,
+    lineHeight: 1.5,
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-all",
+    maxHeight: 240,
+    overflow: "auto",
+    fontFamily: MONO
+  };
+  return (0, import_jsx_runtime9.jsx)("div", {
+    "data-wt-sesschg-diff": true,
+    style: { display: "flex", gap: 8, padding: "2px 10px 8px 34px" },
+    children: [
+      (0, import_jsx_runtime9.jsx)("div", { style: colStyle, children: [(0, import_jsx_runtime9.jsx)("div", { style: headStyle, children: "Before" }), (0, import_jsx_runtime9.jsx)("pre", { style: preStyle, children: beforeText })] }),
+      (0, import_jsx_runtime9.jsx)("div", { style: colStyle, children: [(0, import_jsx_runtime9.jsx)("div", { style: headStyle, children: "After" }), (0, import_jsx_runtime9.jsx)("pre", { style: preStyle, children: afterText })] })
+    ]
+  });
+}
+function PendingItem({ rec, expanded, busy, onToggle, onAdopt, onRevert }) {
+  const { dir, base } = splitPath(rec.file);
+  const open = expanded.has(rec.callId);
+  const opBusy = busy.has(rec.callId);
+  const btnStyle = { ...BTN3, opacity: opBusy ? 0.45 : 1, cursor: opBusy ? "default" : "pointer" };
+  return (0, import_jsx_runtime9.jsx)("div", {
+    "data-wt-sesschg-item": true,
+    children: [
+      (0, import_jsx_runtime9.jsx)("div", {
+        role: "button",
+        tabIndex: 0,
+        onClick: () => onToggle(rec.callId),
+        onKeyDown: (ev) => {
+          if (ev.key === "Enter") {
+            ev.preventDefault();
+            onToggle(rec.callId);
+          }
+        },
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "3px 10px",
+          cursor: "pointer",
+          minHeight: 24
+        },
+        children: [
+          (0, import_jsx_runtime9.jsx)("span", { style: { width: 12, flexShrink: 0, display: "inline-block", textAlign: "center", fontSize: 10 }, children: open ? "\u25BE" : "\u25B8" }),
+          (0, import_jsx_runtime9.jsx)(ToolBadge, { tool: rec.tool }),
+          (0, import_jsx_runtime9.jsx)("span", {
+            style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", minWidth: 0 },
+            title: rec.file,
+            children: [
+              dir !== "" && (0, import_jsx_runtime9.jsx)("span", { style: { color: "var(--dsw-alias-label-secondary, #666)" }, children: dir }),
+              (0, import_jsx_runtime9.jsx)("span", { style: { color: "var(--dsw-alias-label-primary, #1a1a1a)" }, children: base })
+            ]
+          }),
+          (0, import_jsx_runtime9.jsx)("span", { style: { flexShrink: 0, color: "var(--dsw-alias-label-secondary, #666)", fontSize: 11 }, children: relativeTime(new Date(rec.at).toISOString()) }),
+          (0, import_jsx_runtime9.jsx)("button", {
+            type: "button",
+            "data-wt-sesschg-adopt": true,
+            disabled: opBusy,
+            onClick: (ev) => {
+              ev.stopPropagation();
+              onAdopt(rec);
+            },
+            style: { ...btnStyle, color: "#2f855a", borderColor: "var(--dsw-alias-border-l2, #444)" },
+            children: "\u91C7\u7528"
+          }),
+          (0, import_jsx_runtime9.jsx)("button", {
+            type: "button",
+            "data-wt-sesschg-revert": true,
+            disabled: opBusy,
+            onClick: (ev) => {
+              ev.stopPropagation();
+              onRevert(rec);
+            },
+            style: { ...btnStyle, color: "#b7791f", borderColor: "var(--dsw-alias-border-l2, #444)" },
+            children: "\u64A4\u56DE"
+          })
+        ]
+      }),
+      open && (0, import_jsx_runtime9.jsx)(DiffPane, { rec })
+    ]
+  });
+}
+function HistoryItem({ entry }) {
+  const { dir, base } = splitPath(entry.rec.file);
+  const adopted = entry.action === "adopted";
+  const color = adopted ? "#7ec699" : "#e6b450";
+  return (0, import_jsx_runtime9.jsx)("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "3px 10px",
+      minHeight: 24
+    },
+    children: [
+      (0, import_jsx_runtime9.jsx)("span", {
+        style: {
+          width: 44,
+          textAlign: "center",
+          fontSize: 11,
+          fontWeight: 700,
+          color,
+          border: `1px solid ${color}`,
+          borderRadius: 3,
+          flexShrink: 0
+        },
+        children: adopted ? "\u5DF2\u91C7\u7528" : "\u5DF2\u64A4\u56DE"
+      }),
+      (0, import_jsx_runtime9.jsx)("span", {
+        style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", minWidth: 0 },
+        title: entry.rec.file,
+        children: [
+          dir !== "" && (0, import_jsx_runtime9.jsx)("span", { style: { color: "var(--dsw-alias-label-secondary, #666)" }, children: dir }),
+          (0, import_jsx_runtime9.jsx)("span", { style: { color: "var(--dsw-alias-label-primary, #1a1a1a)" }, children: base })
+        ]
+      }),
+      (0, import_jsx_runtime9.jsx)("span", { style: { flexShrink: 0, color: "var(--dsw-alias-label-secondary, #666)", fontSize: 11 }, children: relativeTime(new Date(entry.handledAt).toISOString()) })
+    ]
+  });
+}
+function TurnHeader({ turn, count }) {
+  return (0, import_jsx_runtime9.jsx)("div", {
+    "data-wt-sesschg-turn": true,
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center",
+      padding: "6px 10px 2px",
+      fontWeight: 600,
+      color: "var(--dsw-alias-label-secondary, #666)",
+      fontSize: 12
+    },
+    children: [(0, import_jsx_runtime9.jsx)("span", { children: `\u5BF9\u8BDD #${turn}` }), (0, import_jsx_runtime9.jsx)("span", { style: { opacity: 0.6, fontWeight: 400 }, children: `(${count})` })]
+  });
+}
+function SessionChanges({ cwd, sessionId, rpc, onCountChange }) {
+  const [status, setStatus] = (0, import_react7.useState)("loading");
+  const [error, setError] = (0, import_react7.useState)(null);
+  const [items, setItems] = (0, import_react7.useState)([]);
+  const [historyItems, setHistoryItems] = (0, import_react7.useState)([]);
+  const [expanded, setExpanded] = (0, import_react7.useState)(() => /* @__PURE__ */ new Set());
+  const [busy, setBusy] = (0, import_react7.useState)(() => /* @__PURE__ */ new Set());
+  const [clearing, setClearing] = (0, import_react7.useState)(false);
+  const [opError, setOpError] = (0, import_react7.useState)(null);
+  const itemsRef = (0, import_react7.useRef)(items);
+  (0, import_react7.useEffect)(() => {
+    itemsRef.current = items;
+  }, [items]);
+  const loadHistory = (0, import_react7.useCallback)(() => {
+    return callRpc(rpc, "sessionChanges.history", { cwd, sessionId }).then((value) => setHistoryItems(value.items ?? [])).catch(() => {
+    });
+  }, [cwd, rpc, sessionId]);
+  const load = (0, import_react7.useCallback)(() => {
+    if (!cwd) {
+      setStatus("ready");
+      setItems([]);
+      setHistoryItems([]);
+      setError(null);
+      setOpError(null);
+      onCountChange?.(0);
+      return;
+    }
+    setStatus("loading");
+    setError(null);
+    setOpError(null);
+    Promise.all([
+      callRpc(rpc, "sessionChanges.list", { cwd, sessionId }),
+      callRpc(rpc, "sessionChanges.history", { cwd, sessionId })
+    ]).then(([listVal, histVal]) => {
+      const list = listVal.items ?? [];
+      setItems(list);
+      setHistoryItems(histVal.items ?? []);
+      setStatus("ready");
+      onCountChange?.(list.length);
+    }).catch((err) => {
+      setStatus("error");
+      setError(String(err?.message ?? err));
+    });
+  }, [cwd, rpc, sessionId, onCountChange]);
+  (0, import_react7.useEffect)(() => {
+    load();
+  }, [load]);
+  const pendingGroups = (0, import_react7.useMemo)(() => {
+    const byTurn = /* @__PURE__ */ new Map();
+    for (const rec of items) {
+      if (!byTurn.has(rec.turn)) byTurn.set(rec.turn, []);
+      byTurn.get(rec.turn).push(rec);
+    }
+    return [...byTurn.entries()].sort((a, b2) => a[0] - b2[0]);
+  }, [items]);
+  const historyGroups = (0, import_react7.useMemo)(() => {
+    const order = [];
+    const byTurn = /* @__PURE__ */ new Map();
+    for (const entry of historyItems) {
+      if (!byTurn.has(entry.rec.turn)) {
+        byTurn.set(entry.rec.turn, []);
+        order.push(entry.rec.turn);
+      }
+      byTurn.get(entry.rec.turn).push(entry);
+    }
+    return order.map((turn) => [turn, byTurn.get(turn)]);
+  }, [historyItems]);
+  const toggleExpanded2 = (0, import_react7.useCallback)((callId) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(callId)) next.delete(callId);
+      else next.add(callId);
+      return next;
+    });
+  }, []);
+  const removeLocal = (0, import_react7.useCallback)(
+    (callId) => {
+      const next = itemsRef.current.filter((r) => r.callId !== callId);
+      itemsRef.current = next;
+      setItems(next);
+      onCountChange?.(next.length);
+    },
+    [onCountChange]
+  );
+  const runOp = (0, import_react7.useCallback)(
+    (rec, endpoint) => {
+      setOpError(null);
+      setBusy((prev) => new Set(prev).add(rec.callId));
+      callRpc(rpc, endpoint, { cwd, sessionId, callId: rec.callId }).then(() => {
+        removeLocal(rec.callId);
+        return loadHistory();
+      }).catch((err) => setOpError(String(err?.message ?? err))).finally(() => {
+        setBusy((prev) => {
+          const next = new Set(prev);
+          next.delete(rec.callId);
+          return next;
+        });
+      });
+    },
+    [cwd, rpc, sessionId, removeLocal, loadHistory]
+  );
+  const onAdopt = (0, import_react7.useCallback)((rec) => runOp(rec, "sessionChanges.adopt"), [runOp]);
+  const onRevert = (0, import_react7.useCallback)((rec) => runOp(rec, "sessionChanges.revert"), [runOp]);
+  const onClear = (0, import_react7.useCallback)(() => {
+    setOpError(null);
+    setClearing(true);
+    callRpc(rpc, "sessionChanges.clearHistory", { cwd, sessionId }).then(() => setHistoryItems([])).catch((err) => setOpError(String(err?.message ?? err))).finally(() => setClearing(false));
+  }, [cwd, rpc, sessionId]);
+  let pendingSection;
+  if (status === "loading") {
+    pendingSection = (0, import_jsx_runtime9.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
+  } else if (status === "error") {
+    pendingSection = (0, import_jsx_runtime9.jsx)("div", { "data-wt-error": true, style: { padding: 12, color: "#e06c75" }, children: error });
+  } else if (items.length === 0) {
+    pendingSection = (0, import_jsx_runtime9.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u6CA1\u6709\u5F85\u5904\u7406\u7684\u4F1A\u8BDD\u53D8\u66F4" });
+  } else {
+    pendingSection = (0, import_jsx_runtime9.jsx)("div", {
+      children: pendingGroups.map(
+        ([turn, recs]) => (0, import_jsx_runtime9.jsx)("div", {
+          key: `p-${turn}`,
+          children: [
+            (0, import_jsx_runtime9.jsx)(TurnHeader, { turn, count: recs.length }),
+            recs.map(
+              (rec) => (0, import_jsx_runtime9.jsx)(PendingItem, {
+                key: rec.callId,
+                rec,
+                expanded,
+                busy,
+                onToggle: toggleExpanded2,
+                onAdopt,
+                onRevert
+              })
+            )
+          ]
+        })
+      )
+    });
+  }
+  const historySection = (0, import_jsx_runtime9.jsx)("div", {
+    "data-wt-sesschg-history": true,
+    style: {
+      borderTop: "1px solid var(--dsw-alias-border-l2, #333)",
+      paddingTop: 4,
+      marginTop: 4
+    },
+    children: [
+      (0, import_jsx_runtime9.jsx)("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "4px 10px",
+          flexShrink: 0,
+          color: "var(--dsw-alias-label-secondary, #666)",
+          fontSize: 12
+        },
+        children: [
+          (0, import_jsx_runtime9.jsx)("span", { style: { flex: 1 }, children: "\u5DF2\u5904\u7406\u5386\u53F2" }),
+          (0, import_jsx_runtime9.jsx)("button", {
+            type: "button",
+            "data-wt-sesschg-clear": true,
+            disabled: clearing || historyItems.length === 0,
+            onClick: onClear,
+            style: {
+              ...BTN3,
+              opacity: clearing || historyItems.length === 0 ? 0.45 : 1,
+              cursor: clearing || historyItems.length === 0 ? "default" : "pointer"
+            },
+            children: "\u6E05\u9664"
+          })
+        ]
+      }),
+      historyItems.length === 0 ? (0, import_jsx_runtime9.jsx)("div", { style: { padding: "2px 10px 10px", color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u6682\u65E0\u5DF2\u5904\u7406\u8BB0\u5F55" }) : (0, import_jsx_runtime9.jsx)("div", {
+        children: historyGroups.map(
+          ([turn, entries]) => (0, import_jsx_runtime9.jsx)("div", {
+            key: `h-${turn}`,
+            children: [
+              (0, import_jsx_runtime9.jsx)(TurnHeader, { turn, count: entries.length }),
+              entries.map((entry) => (0, import_jsx_runtime9.jsx)(HistoryItem, { key: entry.rec.callId, entry }))
+            ]
+          })
+        )
+      })
+    ]
+  });
+  return (0, import_jsx_runtime9.jsx)("div", {
+    "data-wt-sesschg": true,
+    style: { display: "flex", flexDirection: "column", minHeight: 0 },
+    children: [
+      opError && (0, import_jsx_runtime9.jsx)("div", {
+        style: {
+          padding: "4px 8px",
+          color: "#e06c75",
+          fontSize: 12,
+          flexShrink: 0,
+          background: "rgba(224,108,117,0.08)",
+          borderBottom: "1px solid var(--dsw-alias-border-l2, #333)"
+        },
+        children: opError
+      }),
+      (0, import_jsx_runtime9.jsx)("div", { style: { flex: 1, minHeight: 0 }, children: pendingSection }),
+      historySection
+    ]
+  });
+}
+
+// src/components/console.js
+var import_jsx_runtime10 = require("react/jsx-runtime");
+var import_react8 = require("react");
 
 // node_modules/@xterm/xterm/lib/xterm.mjs
 var zs = Object.defineProperty;
@@ -11350,14 +11749,14 @@ function buildXtermTheme() {
   };
 }
 function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
-  const [height, setHeight] = (0, import_react7.useState)(280);
-  const [tabs, setTabs] = (0, import_react7.useState)([]);
-  const [active, setActive] = (0, import_react7.useState)(null);
-  const [panelError, setPanelError] = (0, import_react7.useState)(null);
-  const mountRefs = (0, import_react7.useRef)({});
-  const cancelledRef = (0, import_react7.useRef)(/* @__PURE__ */ new Set());
-  const seq = (0, import_react7.useRef)(0);
-  const addTab = (0, import_react7.useCallback)(() => {
+  const [height, setHeight] = (0, import_react8.useState)(280);
+  const [tabs, setTabs] = (0, import_react8.useState)([]);
+  const [active, setActive] = (0, import_react8.useState)(null);
+  const [panelError, setPanelError] = (0, import_react8.useState)(null);
+  const mountRefs = (0, import_react8.useRef)({});
+  const cancelledRef = (0, import_react8.useRef)(/* @__PURE__ */ new Set());
+  const seq = (0, import_react8.useRef)(0);
+  const addTab = (0, import_react8.useCallback)(() => {
     if (!cwd) {
       setPanelError("\u5F53\u524D\u4F1A\u8BDD\u6CA1\u6709\u5DE5\u4F5C\u76EE\u5F55");
       return;
@@ -11384,7 +11783,7 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
       setPanelError(String(err?.message ?? err));
     });
   }, [cwd, rpc, sessionId]);
-  (0, import_react7.useEffect)(() => {
+  (0, import_react8.useEffect)(() => {
     for (const tab of tabs) {
       if (tab.status !== "running" || !tab.ttyId) continue;
       if (mountRefs.current[tab.id]) continue;
@@ -11439,7 +11838,7 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
       mountRefs.current[tab.id] = { term, fit, ws: ws2 };
     }
   }, [tabs, rpc]);
-  (0, import_react7.useEffect)(() => {
+  (0, import_react8.useEffect)(() => {
     return () => {
       for (const [id, m] of Object.entries(mountRefs.current)) {
         m.ws?.close();
@@ -11448,7 +11847,7 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
       }
     };
   }, []);
-  (0, import_react7.useEffect)(() => {
+  (0, import_react8.useEffect)(() => {
     if (typeof MutationObserver === "undefined") return;
     const update = () => {
       const theme = buildXtermTheme();
@@ -11458,7 +11857,7 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
     observer.observe(document.body, { attributes: true, attributeFilter: ["data-ds-dark-theme"] });
     return () => observer.disconnect();
   }, []);
-  (0, import_react7.useEffect)(() => {
+  (0, import_react8.useEffect)(() => {
     if (!open || typeof requestAnimationFrame === "undefined") return;
     const raf = requestAnimationFrame(() => {
       for (const [id, m] of Object.entries(mountRefs.current)) {
@@ -11470,7 +11869,7 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
     });
     return () => cancelAnimationFrame(raf);
   }, [open, active]);
-  (0, import_react7.useEffect)(() => {
+  (0, import_react8.useEffect)(() => {
     if (typeof document === "undefined") return;
     const frame = document.querySelector('[class$="_frame"]');
     if (!frame) return;
@@ -11497,7 +11896,7 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
       document.getElementById("dshwt-console-spacer")?.remove();
     };
   }, [open, height]);
-  const closeTab = (0, import_react7.useCallback)((tab) => {
+  const closeTab = (0, import_react8.useCallback)((tab) => {
     if (!tab.ttyId) cancelledRef.current.add(tab.id);
     if (tab.ttyId) {
       callRpc(rpc, "console.kill", { sessionId: tab.ttyId }).catch(() => {
@@ -11509,8 +11908,8 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
     setTabs((prev) => prev.filter((t) => t.id !== tab.id));
     setActive((prev) => prev === tab.id ? null : prev);
   }, [rpc]);
-  const reopen = (0, import_react7.useCallback)(() => addTab(), [addTab]);
-  const onDragDown = (0, import_react7.useCallback)((e) => {
+  const reopen = (0, import_react8.useCallback)(() => addTab(), [addTab]);
+  const onDragDown = (0, import_react8.useCallback)((e) => {
     const startY = e.clientY;
     const startH = height;
     const move = (ev) => setHeight(Math.min(MAX_H, Math.max(MIN_H2, startH + (startY - ev.clientY))));
@@ -11521,7 +11920,7 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   }, [height]);
-  return (0, import_jsx_runtime9.jsx)("div", {
+  return (0, import_jsx_runtime10.jsx)("div", {
     "data-wt-console": true,
     style: {
       position: "fixed",
@@ -11537,36 +11936,36 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
       flexDirection: "column"
     },
     children: [
-      (0, import_jsx_runtime9.jsx)("div", { "data-wt-console-drag": true, onMouseDown: onDragDown, style: { height: 4, cursor: "row-resize", flexShrink: 0 } }),
-      (0, import_jsx_runtime9.jsx)("div", { "data-wt-console-bar": true, style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderBottom: "1px solid var(--dsw-alias-border-l2, #333)", flexShrink: 0 }, children: [
-        (0, import_jsx_runtime9.jsx)("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u63A7\u5236\u53F0" }),
-        (0, import_jsx_runtime9.jsx)("div", { style: { display: "flex", gap: 4, flex: 1, overflow: "auto" }, children: tabs.map(
-          (t) => (0, import_jsx_runtime9.jsx)("span", { key: t.id, "data-wt-console-tab": true, "data-active": active === t.id || void 0, onClick: () => setActive(t.id), style: { fontSize: 12, padding: "2px 10px", borderRadius: 4, cursor: "pointer", background: active === t.id ? "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,0.08))" : "none", display: "flex", gap: 6, alignItems: "center" }, children: [
+      (0, import_jsx_runtime10.jsx)("div", { "data-wt-console-drag": true, onMouseDown: onDragDown, style: { height: 4, cursor: "row-resize", flexShrink: 0 } }),
+      (0, import_jsx_runtime10.jsx)("div", { "data-wt-console-bar": true, style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderBottom: "1px solid var(--dsw-alias-border-l2, #333)", flexShrink: 0 }, children: [
+        (0, import_jsx_runtime10.jsx)("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u63A7\u5236\u53F0" }),
+        (0, import_jsx_runtime10.jsx)("div", { style: { display: "flex", gap: 4, flex: 1, overflow: "auto" }, children: tabs.map(
+          (t) => (0, import_jsx_runtime10.jsx)("span", { key: t.id, "data-wt-console-tab": true, "data-active": active === t.id || void 0, onClick: () => setActive(t.id), style: { fontSize: 12, padding: "2px 10px", borderRadius: 4, cursor: "pointer", background: active === t.id ? "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,0.08))" : "none", display: "flex", gap: 6, alignItems: "center" }, children: [
             t.title,
-            t.status === "exited" && (0, import_jsx_runtime9.jsx)("span", { style: { color: "#e06c75", fontSize: 10 }, children: "\u5DF2\u9000\u51FA" }),
-            t.status === "exited" && (0, import_jsx_runtime9.jsx)("span", { role: "button", "data-wt-console-reopen": true, onClick: (e) => {
+            t.status === "exited" && (0, import_jsx_runtime10.jsx)("span", { style: { color: "#e06c75", fontSize: 10 }, children: "\u5DF2\u9000\u51FA" }),
+            t.status === "exited" && (0, import_jsx_runtime10.jsx)("span", { role: "button", "data-wt-console-reopen": true, onClick: (e) => {
               e.stopPropagation();
               reopen();
             }, style: { color: "#98c379", fontSize: 10, cursor: "pointer" }, children: "\u91CD\u5F00" }),
-            (0, import_jsx_runtime9.jsx)("span", { role: "button", "data-wt-console-close": true, onClick: (e) => {
+            (0, import_jsx_runtime10.jsx)("span", { role: "button", "data-wt-console-close": true, onClick: (e) => {
               e.stopPropagation();
               closeTab(t);
             }, style: { cursor: "pointer", color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u2715" })
           ] })
         ) }),
-        (0, import_jsx_runtime9.jsx)("button", { type: "button", "data-wt-console-new": true, onClick: addTab, style: { background: "none", border: "1px solid var(--dsw-alias-border-l2, #444)", borderRadius: 4, color: "var(--dsw-alias-label-secondary, #666)", cursor: "pointer", fontSize: 12, padding: "0 8px" }, children: "+" }),
-        (0, import_jsx_runtime9.jsx)("button", { type: "button", "data-wt-console-collapse": true, onClick: onToggle, style: { background: "none", border: "none", cursor: "pointer", color: "var(--dsw-alias-label-secondary, #666)", fontSize: 12 }, children: "\u25BE" })
+        (0, import_jsx_runtime10.jsx)("button", { type: "button", "data-wt-console-new": true, onClick: addTab, style: { background: "none", border: "1px solid var(--dsw-alias-border-l2, #444)", borderRadius: 4, color: "var(--dsw-alias-label-secondary, #666)", cursor: "pointer", fontSize: 12, padding: "0 8px" }, children: "+" }),
+        (0, import_jsx_runtime10.jsx)("button", { type: "button", "data-wt-console-collapse": true, onClick: onToggle, style: { background: "none", border: "none", cursor: "pointer", color: "var(--dsw-alias-label-secondary, #666)", fontSize: 12 }, children: "\u25BE" })
       ] }),
-      panelError && (0, import_jsx_runtime9.jsx)("div", { "data-wt-console-error": true, style: { padding: "4px 10px", color: "#e06c75", fontSize: 12, borderBottom: "1px solid var(--dsw-alias-border-l2, #333)" }, children: panelError }),
-      (0, import_jsx_runtime9.jsx)("div", { style: { flex: 1, minHeight: 0, position: "relative", display: "flex" }, children: tabs.map(
-        (t) => (0, import_jsx_runtime9.jsx)("div", {
+      panelError && (0, import_jsx_runtime10.jsx)("div", { "data-wt-console-error": true, style: { padding: "4px 10px", color: "#e06c75", fontSize: 12, borderBottom: "1px solid var(--dsw-alias-border-l2, #333)" }, children: panelError }),
+      (0, import_jsx_runtime10.jsx)("div", { style: { flex: 1, minHeight: 0, position: "relative", display: "flex" }, children: tabs.map(
+        (t) => (0, import_jsx_runtime10.jsx)("div", {
           key: t.id,
           id: `dshwt-term-${t.id}`,
           "data-wt-console-term": true,
           style: { flex: 1, minWidth: 0, display: active === t.id ? "block" : "none", position: "relative", padding: 4 }
         })
       ) }),
-      tabs.length === 0 && (0, import_jsx_runtime9.jsx)("div", { style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--dsw-alias-label-secondary, #888)", fontSize: 12 }, children: "\u70B9\u51FB + \u65B0\u5EFA\u7EC8\u7AEF" })
+      tabs.length === 0 && (0, import_jsx_runtime10.jsx)("div", { style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--dsw-alias-label-secondary, #888)", fontSize: 12 }, children: "\u70B9\u51FB + \u65B0\u5EFA\u7EC8\u7AEF" })
     ]
   });
 }
@@ -11575,29 +11974,31 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
 var TABS = [
   { id: "files", label: "\u6587\u4EF6" },
   { id: "changes", label: "\u53D8\u66F4" },
+  { id: "sessionChanges", label: "\u4F1A\u8BDD\u53D8\u66F4" },
   { id: "sessions", label: "\u4F1A\u8BDD" }
 ];
 var PANEL_ICON_PATH = "M9.67272 0.522841C10.8339 0.522841 11.76 0.522714 12.4963 0.602493C13.2453 0.683657 13.8789 0.854248 14.4264 1.25197C14.7504 1.48739 15.0355 1.77247 15.2709 2.0965C15.6686 2.64394 15.8392 3.27758 15.9204 4.02655C16.0002 4.7629 16 5.68895 16 6.85014V9.14986C16 10.3111 16.0002 11.2371 15.9204 11.9735C15.8392 12.7224 15.6686 13.3561 15.2709 13.9035C15.0355 14.2275 14.7504 14.5126 14.4264 14.748C13.8789 15.1458 13.2453 15.3163 12.4963 15.3975C11.76 15.4773 10.8339 15.4772 9.67272 15.4772H6.3273C5.16611 15.4772 4.24006 15.4773 3.50371 15.3975C2.75474 15.3163 2.1211 15.1458 1.57366 14.748C1.24963 14.5126 0.964549 14.2275 0.729131 13.9035C0.331407 13.3561 0.160817 12.7224 0.0796529 11.9735C-0.000126137 11.2371 1.25338e-09 10.3111 1.25338e-09 9.14986V6.85014C1.25329e-09 5.68895 -0.000126137 4.7629 0.0796529 4.02655C0.160817 3.27758 0.331407 2.64394 0.729131 2.0965C0.964549 1.77247 1.24963 1.48739 1.57366 1.25197C2.1211 0.854248 2.75474 0.683657 3.50371 0.602493C4.24006 0.522714 5.16611 0.522841 6.3273 0.522841H9.67272ZM5.54303 1.88715V14.1118C5.78636 14.1128 6.04709 14.1169 6.3273 14.1169H9.67272C10.8639 14.1169 11.7032 14.1164 12.3493 14.0465C12.9824 13.9779 13.3497 13.8494 13.6268 13.6482C13.8354 13.4966 14.0195 13.3125 14.1711 13.1039C14.3723 12.8268 14.5007 12.4595 14.5693 11.8264C14.6393 11.1803 14.6398 10.341 14.6398 9.14986V6.85014C14.6398 5.65896 14.6393 4.81967 14.5693 4.1736C14.5007 3.54048 14.3723 3.17318 14.1711 2.89609C14.0195 2.68747 13.8354 2.50337 13.6268 2.35179C13.3497 2.1506 12.9824 2.02212 12.3493 1.95353C11.7032 1.88358 10.8639 1.88307 9.67272 1.88307H6.3273C6.04709 1.88307 5.78636 1.8862 5.54303 1.88715ZM4.1828 1.91166C3.99125 1.9216 3.8148 1.93577 3.65076 1.95353C3.01764 2.02212 2.65034 2.1506 2.37325 2.35179C2.16463 2.50337 1.98052 2.68747 1.82895 2.89609C1.62776 3.17318 1.49928 3.54048 1.43069 4.1736C1.36074 4.81967 1.36023 5.65896 1.36023 6.85014V9.14986C1.36023 10.341 1.36074 11.1803 1.43069 11.8264C1.49928 12.4595 1.62776 12.8268 1.82895 13.1039C1.98052 13.3125 2.16463 13.4966 2.37325 13.6482C2.65034 13.8494 3.01764 13.9779 3.65076 14.0465C3.81478 14.0642 3.99127 14.0774 4.1828 14.0873V1.91166Z";
 function panelIcon(rotate) {
-  return (0, import_jsx_runtime10.jsx)("svg", {
+  return (0, import_jsx_runtime11.jsx)("svg", {
     width: 16,
     height: 16,
     viewBox: "0 0 16 16",
     fill: "none",
     "aria-hidden": true,
     style: rotate ? { transform: "rotate(180deg)" } : void 0,
-    children: (0, import_jsx_runtime10.jsx)("path", { fillRule: "evenodd", clipRule: "evenodd", d: PANEL_ICON_PATH, fill: "currentColor" })
+    children: (0, import_jsx_runtime11.jsx)("path", { fillRule: "evenodd", clipRule: "evenodd", d: PANEL_ICON_PATH, fill: "currentColor" })
   });
 }
 function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
-  const [open, setOpen] = (0, import_react8.useState)(true);
-  const [tab, setTab] = (0, import_react8.useState)("files");
-  const [railW, setRailW] = (0, import_react8.useState)(300);
-  const [changeCount, setChangeCount] = (0, import_react8.useState)(0);
-  const [consoleOpen, setConsoleOpen] = (0, import_react8.useState)(false);
+  const [open, setOpen] = (0, import_react9.useState)(true);
+  const [tab, setTab] = (0, import_react9.useState)("files");
+  const [railW, setRailW] = (0, import_react9.useState)(300);
+  const [changeCount, setChangeCount] = (0, import_react9.useState)(0);
+  const [sessionChangeCount, setSessionChangeCount] = (0, import_react9.useState)(0);
+  const [consoleOpen, setConsoleOpen] = (0, import_react9.useState)(false);
   const current = useSessions((s15) => s15.current);
   const cwd = useSessions((s15) => s15.current ? s15.byId[s15.current]?.cwd : void 0);
-  const onResizeDown = (0, import_react8.useCallback)((e) => {
+  const onResizeDown = (0, import_react9.useCallback)((e) => {
     const move = (ev) => setRailW(Math.min(600, Math.max(200, window.innerWidth - ev.clientX)));
     const up = () => {
       window.removeEventListener("mousemove", move);
@@ -11606,12 +12007,12 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   }, []);
-  const iconTab = (0, import_react8.useCallback)((id) => {
+  const iconTab = (0, import_react9.useCallback)((id) => {
     setOpen(true);
     setTab(id);
   }, []);
   const railWidth = open ? railW : 56;
-  (0, import_react8.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     if (typeof document === "undefined") return;
     const frame = document.querySelector('[class$="_frame"]');
     if (!frame) return;
@@ -11630,7 +12031,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
       document.getElementById("dshwt-rail-spacer")?.remove();
     };
   }, [railWidth]);
-  return (0, import_jsx_runtime10.jsx)("div", {
+  return (0, import_jsx_runtime11.jsx)("div", {
     "data-wt-rail": true,
     "data-collapsed": open ? void 0 : true,
     style: {
@@ -11647,7 +12048,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
     },
     children: [
       // ── 展开态 ──
-      open && (0, import_jsx_runtime10.jsx)("div", {
+      open && (0, import_jsx_runtime11.jsx)("div", {
         "data-wt-resize": true,
         onMouseDown: onResizeDown,
         title: "\u62D6\u62FD\u8C03\u6574\u5BBD\u5EA6",
@@ -11659,7 +12060,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
           borderLeft: "1px solid var(--dsw-alias-border-l2, #333)"
         }
       }),
-      open && (0, import_jsx_runtime10.jsx)("div", {
+      open && (0, import_jsx_runtime11.jsx)("div", {
         "data-wt-panel": true,
         style: {
           flex: 1,
@@ -11672,7 +12073,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
           minHeight: 0
         },
         children: [
-          (0, import_jsx_runtime10.jsx)("div", {
+          (0, import_jsx_runtime11.jsx)("div", {
             "data-wt-tabs": true,
             style: {
               display: "flex",
@@ -11681,7 +12082,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
             },
             children: [
               // M5 需求 2：收起按钮放在「文件」页签左侧（原来在 rail 独立窄条）
-              (0, import_jsx_runtime10.jsx)("button", {
+              (0, import_jsx_runtime11.jsx)("button", {
                 type: "button",
                 "data-wt-toggle": true,
                 "aria-label": "\u6536\u8D77\u5DE5\u5177\u4FA7\u8FB9\u680F",
@@ -11702,7 +12103,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
                 children: panelIcon(false)
               }),
               TABS.map(
-                (t) => (0, import_jsx_runtime10.jsx)("button", {
+                (t) => (0, import_jsx_runtime11.jsx)("button", {
                   key: t.id,
                   type: "button",
                   onClick: () => setTab(t.id),
@@ -11717,11 +12118,11 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
                     color: tab === t.id ? "var(--dsw-alias-label-primary, #1a1a1a)" : "var(--dsw-alias-label-secondary, #666)",
                     borderBottom: tab === t.id ? "2px solid var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6)" : "2px solid transparent"
                   },
-                  children: t.id === "changes" && changeCount > 0 ? `\u53D8\u66F4 ${changeCount}` : t.label
+                  children: t.id === "changes" && changeCount > 0 ? `\u53D8\u66F4 ${changeCount}` : t.id === "sessionChanges" && sessionChangeCount > 0 ? `\u4F1A\u8BDD\u53D8\u66F4 ${sessionChangeCount}` : t.label
                 })
               ),
               // 控制台开关（M4）：固定在页签条右端；面板本身 fixed 于底部
-              (0, import_jsx_runtime10.jsx)("button", {
+              (0, import_jsx_runtime11.jsx)("button", {
                 type: "button",
                 "data-wt-console-toggle": true,
                 "data-active": consoleOpen || void 0,
@@ -11741,15 +12142,15 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
               })
             ]
           }),
-          (0, import_jsx_runtime10.jsx)("div", {
+          (0, import_jsx_runtime11.jsx)("div", {
             "data-wt-tabpanel": true,
             style: { flex: 1, minHeight: 0, overflow: "auto", padding: "4px 0" },
-            children: tab === "sessions" ? (0, import_jsx_runtime10.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime10.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : (0, import_jsx_runtime10.jsx)(Changes, { cwd, sessionId: current, rpc, onCountChange: setChangeCount })
+            children: tab === "sessions" ? (0, import_jsx_runtime11.jsx)(SessionList, { useSessions, openSession }) : tab === "files" ? (0, import_jsx_runtime11.jsx)(FileTree, { key: cwd ?? "no-cwd", cwd, sessionId: current, rpc, insertIntoComposer }) : tab === "sessionChanges" ? (0, import_jsx_runtime11.jsx)(SessionChanges, { cwd, sessionId: current, rpc, onCountChange: setSessionChangeCount }) : (0, import_jsx_runtime11.jsx)(Changes, { cwd, sessionId: current, rpc, onCountChange: setChangeCount })
           })
         ]
       }),
       // ── 收起态：56px 窄 rail，竖排图标（M5 需求 2：文件图标上方加「展开」按钮）──
-      !open && (0, import_jsx_runtime10.jsx)("div", {
+      !open && (0, import_jsx_runtime11.jsx)("div", {
         "data-wt-rail-icons": true,
         style: {
           width: 56,
@@ -11763,7 +12164,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
         },
         children: [
           // M5 需求 2：展开右侧边栏按钮（文件图标上面）
-          (0, import_jsx_runtime10.jsx)("button", {
+          (0, import_jsx_runtime11.jsx)("button", {
             type: "button",
             "data-wt-expand": true,
             title: "\u5C55\u5F00\u53F3\u4FA7\u8FB9\u680F",
@@ -11772,7 +12173,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
             style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--dsw-alias-label-secondary, #666)" },
             children: panelIcon(true)
           }),
-          (0, import_jsx_runtime10.jsx)("button", {
+          (0, import_jsx_runtime11.jsx)("button", {
             type: "button",
             "data-wt-icon": "files",
             title: "\u6587\u4EF6",
@@ -11780,7 +12181,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
             style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" },
             children: "\u{1F4C1}"
           }),
-          (0, import_jsx_runtime10.jsx)("button", {
+          (0, import_jsx_runtime11.jsx)("button", {
             type: "button",
             "data-wt-icon": "changes",
             title: "\u53D8\u66F4",
@@ -11788,7 +12189,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
             style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" },
             children: "\u{1F500}"
           }),
-          (0, import_jsx_runtime10.jsx)("button", {
+          (0, import_jsx_runtime11.jsx)("button", {
             type: "button",
             "data-wt-icon": "sessions",
             title: "\u4F1A\u8BDD",
@@ -11797,7 +12198,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
             children: "\u{1F4AC}"
           }),
           // M5 需求 3：终端图标只弹控制台，不展开右侧边栏
-          (0, import_jsx_runtime10.jsx)("button", {
+          (0, import_jsx_runtime11.jsx)("button", {
             type: "button",
             "data-wt-icon": "console",
             title: "\u7EC8\u7AEF",
@@ -11810,7 +12211,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
       }),
       // 控制台面板（M4）：**常驻渲染**（不条件卸载），open 只控制 display——收起不丢会话。
       // 面板 fixed 于视口底部，渲染在 rail 内无妨（fixed 脱离定位）。
-      (0, import_jsx_runtime10.jsx)(ConsolePanel, { cwd, sessionId: current, rpc, open: consoleOpen, onToggle: () => setConsoleOpen(false) })
+      (0, import_jsx_runtime11.jsx)(ConsolePanel, { cwd, sessionId: current, rpc, open: consoleOpen, onToggle: () => setConsoleOpen(false) })
     ]
   });
 }
