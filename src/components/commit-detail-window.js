@@ -47,7 +47,7 @@ export function CommitDetailWindow({ target, cwd, sessionId, rpc, onClose }) {
 
   let body;
   if (status === "loading") {
-    body = jsx("div", { "data-wt-commit-detail-loading": true, style: { padding: 16, color: "var(--dsw-alias-text-secondary, #999)" }, children: "加载中…" });
+    body = jsx("div", { "data-wt-commit-detail-loading": true, style: { padding: 16, color: "var(--dsw-alias-label-secondary, #666)" }, children: "加载中…" });
   } else if (status === "error") {
     body = jsx("div", { "data-wt-commit-detail-error": true, style: { padding: 16, color: "#e06c75" }, children: error });
   } else {
@@ -71,7 +71,7 @@ export function CommitDetailWindow({ target, cwd, sessionId, rpc, onClose }) {
                 display: "flex",
                 gap: 6,
                 alignItems: "center",
-                background: sel === f.path ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none",
+                background: sel === f.path ? "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,0.06))" : "none",
               },
               children: [
                 jsx("span", {
@@ -91,7 +91,7 @@ export function CommitDetailWindow({ target, cwd, sessionId, rpc, onClose }) {
           (diffError
             ? jsx("div", { "data-wt-commit-diff-error": true, style: { padding: 12, color: "#e06c75" }, children: diffError })
             : !diffLines
-              ? jsx("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "加载 diff…" })
+              ? jsx("div", { style: { padding: 12, color: "var(--dsw-alias-label-secondary, #666)" }, children: "加载 diff…" })
               : jsx("div", { style: { flex: 1, overflow: "auto", minHeight: 0 }, children: jsx(DiffLines, { lines: diffLines }) })),
       ],
     });

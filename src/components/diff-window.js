@@ -54,7 +54,7 @@ export function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
   if (diffError) {
     body = jsx("div", { "data-wt-diff-error": true, style: { padding: 16, color: "#e06c75" }, children: diffError });
   } else if (!diffLines) {
-    body = jsx("div", { "data-wt-diff-loading": true, style: { padding: 16, color: "var(--dsw-alias-text-secondary, #999)" }, children: "加载 diff…" });
+    body = jsx("div", { "data-wt-diff-loading": true, style: { padding: 16, color: "var(--dsw-alias-label-secondary, #666)" }, children: "加载 diff…" });
   } else {
     body = jsx("div", {
       ref: bodyRef,

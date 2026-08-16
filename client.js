@@ -62,7 +62,7 @@ function SessionList({ useSessions, openSession }) {
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
-          background: active ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
+          background: active ? "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,0.06))" : "none"
         },
         children: s15?.displayTitle ?? id
       });
@@ -241,7 +241,7 @@ var BTN = {
   background: "none",
   border: "1px solid var(--dsw-alias-border-l2, #444)",
   borderRadius: 4,
-  color: "var(--dsw-alias-text-secondary, #999)",
+  color: "var(--dsw-alias-label-secondary, #666)",
   cursor: "pointer",
   padding: "1px 7px",
   fontSize: 11,
@@ -349,7 +349,7 @@ function DraggableWindow({ title, badge, width = 640, onClose, search, wtPrefix 
       minHeight: MIN_H,
       display: "flex",
       flexDirection: "column",
-      background: "var(--dsw-alias-bg-base, #1a1a1a)",
+      background: "var(--dsw-alias-bg-base, #ffffff)",
       border: "1px solid var(--dsw-alias-border-l2, #333)",
       borderRadius: 8,
       boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
@@ -368,7 +368,7 @@ function DraggableWindow({ title, badge, width = 640, onClose, search, wtPrefix 
           gap: 8,
           padding: "6px 10px",
           cursor: "move",
-          background: "var(--dsw-alias-bg-float, #1f1f1f)",
+          background: "var(--dsw-alias-bg-overlay, #ffffff)",
           borderBottom: "1px solid var(--dsw-alias-border-l2, #333)",
           flexShrink: 0,
           userSelect: "none"
@@ -382,7 +382,7 @@ function DraggableWindow({ title, badge, width = 640, onClose, search, wtPrefix 
             [wt2.close]: true,
             onClick: onClose,
             title: "\u5173\u95ED\uFF08Esc\uFF09",
-            style: { marginLeft: "auto", background: "none", border: "none", color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", fontSize: 14, padding: "0 4px", flexShrink: 0 },
+            style: { marginLeft: "auto", background: "none", border: "none", color: "var(--dsw-alias-label-secondary, #666)", cursor: "pointer", fontSize: 14, padding: "0 4px", flexShrink: 0 },
             children: "\u2715"
           })
         ]
@@ -401,7 +401,7 @@ function DraggableWindow({ title, badge, width = 640, onClose, search, wtPrefix 
               if (e.key === "Enter") search.onEnter(e);
               if (e.key === "Escape") onClose();
             },
-            style: { flex: 1, background: "var(--dsw-alias-bg-base, #141414)", border: "1px solid var(--dsw-alias-border-l2, #333)", borderRadius: 4, color: "var(--dsw-alias-text-primary, #ddd)", padding: "3px 8px", fontSize: 12, outline: "none" }
+            style: { flex: 1, background: "var(--dsw-alias-bg-base, #ffffff)", border: "1px solid var(--dsw-alias-border-l2, #333)", borderRadius: 4, color: "var(--dsw-alias-label-primary, #1a1a1a)", padding: "3px 8px", fontSize: 12, outline: "none" }
           }),
           hasQuery && (0, import_jsx_runtime2.jsx)("button", { type: "button", [wt2.prev]: true, onClick: search.onPrev, style: BTN, children: "\u2191" }),
           hasQuery && (0, import_jsx_runtime2.jsx)("button", { type: "button", [wt2.next]: true, onClick: search.onNext, style: BTN, children: "\u2193" })
@@ -423,7 +423,7 @@ function DraggableWindow({ title, badge, width = 640, onClose, search, wtPrefix 
           cursor: "nwse-resize",
           flexShrink: 0,
           zIndex: 2,
-          background: "linear-gradient(135deg, transparent 50%, var(--dsw-alias-text-secondary, #555) 50%)",
+          background: "linear-gradient(135deg, transparent 50%, var(--dsw-alias-label-secondary, #888) 50%)",
           backgroundSize: "10px 10px",
           backgroundRepeat: "no-repeat",
           backgroundPosition: "bottom right",
@@ -508,7 +508,7 @@ function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
   if (state === "error") {
     body = (0, import_jsx_runtime3.jsx)("div", { "data-wt-preview-error": true, style: { padding: 16, color: "#e06c75" }, children: error });
   } else if (state === "loading") {
-    body = (0, import_jsx_runtime3.jsx)("div", { "data-wt-preview-loading": true, style: { padding: 16, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
+    body = (0, import_jsx_runtime3.jsx)("div", { "data-wt-preview-loading": true, style: { padding: 16, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
   } else if (kind === "image") {
     body = (0, import_jsx_runtime3.jsx)("div", { style: { flex: 1, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }, children: (0, import_jsx_runtime3.jsx)("img", { "data-wt-preview-image": true, src: imgUrl, alt: file, style: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 4 } }) });
   } else {
@@ -523,11 +523,11 @@ function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
           "data-line": i,
           "data-wt-preview-line": true,
           "data-wt-match": isMatch || void 0,
-          style: { display: "flex", background: isMatch ? "rgba(230,180,80,0.28)" : "none", color: isMatch ? "#f0d59a" : void 0 },
+          style: { display: "flex", background: isMatch ? "rgba(230,180,80,0.28)" : "none", color: isMatch ? "#9e6a03" : void 0 },
           children: [
             (0, import_jsx_runtime3.jsx)("span", {
               "data-wt-preview-lineno": true,
-              style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 8, userSelect: "none" },
+              style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-label-secondary, #888)", paddingRight: 8, userSelect: "none" },
               children: String(i + 1)
             }),
             (0, import_jsx_runtime3.jsx)("span", {
@@ -691,9 +691,9 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
   }, [menu, sessionId, insertIntoComposer, closeMenu]);
   let body;
   if (!cwd) {
-    body = (0, import_jsx_runtime4.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u5F53\u524D\u4F1A\u8BDD\u6CA1\u6709\u5DE5\u4F5C\u76EE\u5F55" });
+    body = (0, import_jsx_runtime4.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u5F53\u524D\u4F1A\u8BDD\u6CA1\u6709\u5DE5\u4F5C\u76EE\u5F55" });
   } else if (!root || root.status === "loading") {
-    body = (0, import_jsx_runtime4.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
+    body = (0, import_jsx_runtime4.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
   } else if (root.status === "error") {
     body = (0, import_jsx_runtime4.jsx)("div", { "data-wt-error": true, style: { padding: 12, color: "#e06c75" }, children: root.error });
   } else {
@@ -731,7 +731,7 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
               paddingLeft: 8 + row.depth * 14,
               cursor: "pointer",
               whiteSpace: "nowrap",
-              background: selected === row.rel ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
+              background: selected === row.rel ? "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,0.06))" : "none"
             },
             children: [
               (0, import_jsx_runtime4.jsx)("span", { style: { width: 14, flexShrink: 0, display: "inline-block", textAlign: "center" }, children: row.isDir ? isOpen ? "\u25BE" : "\u25B8" : "" }),
@@ -768,7 +768,7 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
           background: "transparent",
           border: "none",
           borderBottom: "1px solid var(--dsw-alias-border-l2, #333)",
-          color: "var(--dsw-alias-text-primary, #ddd)",
+          color: "var(--dsw-alias-label-primary, #1a1a1a)",
           outline: "none",
           fontSize: 12
         }
@@ -783,7 +783,7 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
           top: menu.y,
           zIndex: 30,
           minWidth: 150,
-          background: "var(--dsw-alias-bg-float, #1f1f1f)",
+          background: "var(--dsw-alias-bg-overlay, #ffffff)",
           border: "1px solid var(--dsw-alias-border-l2, #333)",
           borderRadius: 6,
           boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
@@ -941,7 +941,7 @@ function DiffLines({ lines, matches = [] }) {
     style: { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "11px", paddingBottom: 8 },
     children: lines.map((l, i) => {
       let bg = "none";
-      let color = "var(--dsw-alias-text-primary, #ddd)";
+      let color = "var(--dsw-alias-label-primary, #1a1a1a)";
       if (l.kind === "add") {
         bg = "rgba(126,198,153,0.15)";
         color = "#7ec699";
@@ -952,12 +952,12 @@ function DiffLines({ lines, matches = [] }) {
         bg = "rgba(97,175,239,0.12)";
         color = "#61afef";
       } else if (l.kind === "meta") {
-        color = "var(--dsw-alias-text-secondary, #999)";
+        color = "var(--dsw-alias-label-secondary, #666)";
       }
       const isMatch = matches.includes(i);
       if (isMatch) {
         bg = "rgba(230,180,80,0.28)";
-        color = "#f0d59a";
+        color = "#9e6a03";
       }
       const oldCell = l.oldLine !== null ? String(l.oldLine) : " ";
       const newCell = l.newLine !== null ? String(l.newLine) : " ";
@@ -969,8 +969,8 @@ function DiffLines({ lines, matches = [] }) {
         "data-wt-match": isMatch || void 0,
         style: { display: "flex", background: bg, color, padding: "0 8px", whiteSpace: "pre" },
         children: [
-          (0, import_jsx_runtime5.jsx)("span", { style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 4 }, children: oldCell }),
-          (0, import_jsx_runtime5.jsx)("span", { style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 8 }, children: newCell }),
+          (0, import_jsx_runtime5.jsx)("span", { style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-label-secondary, #888)", paddingRight: 4 }, children: oldCell }),
+          (0, import_jsx_runtime5.jsx)("span", { style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-label-secondary, #888)", paddingRight: 8 }, children: newCell }),
           (0, import_jsx_runtime5.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: l.text })
         ]
       });
@@ -1013,7 +1013,7 @@ function DiffWindow({ file, untracked, diffLines, diffError, onClose }) {
   if (diffError) {
     body = (0, import_jsx_runtime6.jsx)("div", { "data-wt-diff-error": true, style: { padding: 16, color: "#e06c75" }, children: diffError });
   } else if (!diffLines) {
-    body = (0, import_jsx_runtime6.jsx)("div", { "data-wt-diff-loading": true, style: { padding: 16, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D diff\u2026" });
+    body = (0, import_jsx_runtime6.jsx)("div", { "data-wt-diff-loading": true, style: { padding: 16, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u52A0\u8F7D diff\u2026" });
   } else {
     body = (0, import_jsx_runtime6.jsx)("div", {
       ref: bodyRef,
@@ -1083,7 +1083,7 @@ function CommitDetailWindow({ target, cwd, sessionId, rpc, onClose }) {
   );
   let body;
   if (status === "loading") {
-    body = (0, import_jsx_runtime7.jsx)("div", { "data-wt-commit-detail-loading": true, style: { padding: 16, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
+    body = (0, import_jsx_runtime7.jsx)("div", { "data-wt-commit-detail-loading": true, style: { padding: 16, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
   } else if (status === "error") {
     body = (0, import_jsx_runtime7.jsx)("div", { "data-wt-commit-detail-error": true, style: { padding: 16, color: "#e06c75" }, children: error });
   } else {
@@ -1107,7 +1107,7 @@ function CommitDetailWindow({ target, cwd, sessionId, rpc, onClose }) {
                 display: "flex",
                 gap: 6,
                 alignItems: "center",
-                background: sel === f.path ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
+                background: sel === f.path ? "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,0.06))" : "none"
               },
               children: [
                 (0, import_jsx_runtime7.jsx)("span", {
@@ -1129,7 +1129,7 @@ function CommitDetailWindow({ target, cwd, sessionId, rpc, onClose }) {
           )
         }),
         // diff 视图（下半）
-        sel && (diffError ? (0, import_jsx_runtime7.jsx)("div", { "data-wt-commit-diff-error": true, style: { padding: 12, color: "#e06c75" }, children: diffError }) : !diffLines ? (0, import_jsx_runtime7.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D diff\u2026" }) : (0, import_jsx_runtime7.jsx)("div", { style: { flex: 1, overflow: "auto", minHeight: 0 }, children: (0, import_jsx_runtime7.jsx)(DiffLines, { lines: diffLines }) }))
+        sel && (diffError ? (0, import_jsx_runtime7.jsx)("div", { "data-wt-commit-diff-error": true, style: { padding: 12, color: "#e06c75" }, children: diffError }) : !diffLines ? (0, import_jsx_runtime7.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u52A0\u8F7D diff\u2026" }) : (0, import_jsx_runtime7.jsx)("div", { style: { flex: 1, overflow: "auto", minHeight: 0 }, children: (0, import_jsx_runtime7.jsx)(DiffLines, { lines: diffLines }) }))
       ]
     });
   }
@@ -1152,10 +1152,10 @@ var STATUS_COLOR2 = {
   R: "#61afef"
 };
 var BTN2 = {
-  background: "var(--dsw-alias-bg-float, #1f1f1f)",
+  background: "var(--dsw-alias-bg-overlay, #ffffff)",
   border: "1px solid var(--dsw-alias-border-l2, #444)",
   borderRadius: 4,
-  color: "var(--dsw-alias-text-primary, #ddd)",
+  color: "var(--dsw-alias-label-primary, #1a1a1a)",
   cursor: "pointer",
   padding: "2px 8px",
   fontSize: 12,
@@ -1376,11 +1376,11 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
   }, []);
   let list;
   if (status === "loading") {
-    list = (0, import_jsx_runtime8.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
+    list = (0, import_jsx_runtime8.jsx)("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u52A0\u8F7D\u4E2D\u2026" });
   } else if (status === "error") {
     list = (0, import_jsx_runtime8.jsx)("div", { "data-wt-error": true, style: { padding: 12, color: "#e06c75" }, children: error });
   } else if (rows.length === 0) {
-    list = (0, import_jsx_runtime8.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u6CA1\u6709\u53D8\u66F4" });
+    list = (0, import_jsx_runtime8.jsx)("div", { style: { padding: 12, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u6CA1\u6709\u53D8\u66F4" });
   } else {
     list = (0, import_jsx_runtime8.jsx)("div", {
       "data-wt-changes-list": true,
@@ -1393,7 +1393,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
             padding: "4px 10px",
             fontWeight: 600,
             cursor: "pointer",
-            color: "var(--dsw-alias-text-secondary, #999)",
+            color: "var(--dsw-alias-label-secondary, #666)",
             display: "flex",
             gap: 6,
             alignItems: "center"
@@ -1416,7 +1416,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
             display: "flex",
             gap: 6,
             alignItems: "center",
-            background: selected?.path === row.path ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
+            background: selected?.path === row.path ? "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,0.06))" : "none"
           },
           children: [
             (0, import_jsx_runtime8.jsx)("input", {
@@ -1426,7 +1426,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
               onChange: () => toggleChecked(row.path),
               onClick: (e) => e.stopPropagation(),
               // 勾选不触发行点击（打开 diff）
-              style: { flexShrink: 0, margin: 0, accentColor: "var(--dsw-alias-accent, #4f8cff)" }
+              style: { flexShrink: 0, margin: 0, accentColor: "var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6)" }
             }),
             (0, import_jsx_runtime8.jsx)("span", {
               style: {
@@ -1449,11 +1449,11 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
   }
   let history;
   if (histStatus === "loading") {
-    history = (0, import_jsx_runtime8.jsx)("div", { style: { padding: 10, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u52A0\u8F7D\u5386\u53F2\u2026" });
+    history = (0, import_jsx_runtime8.jsx)("div", { style: { padding: 10, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u52A0\u8F7D\u5386\u53F2\u2026" });
   } else if (histStatus === "error") {
     history = (0, import_jsx_runtime8.jsx)("div", { "data-wt-history-error": true, style: { padding: 10, color: "#e06c75" }, children: histError });
   } else if (commits.length === 0) {
-    history = (0, import_jsx_runtime8.jsx)("div", { style: { padding: 10, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u6CA1\u6709\u63D0\u4EA4\u8BB0\u5F55" });
+    history = (0, import_jsx_runtime8.jsx)("div", { style: { padding: 10, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u6CA1\u6709\u63D0\u4EA4\u8BB0\u5F55" });
   } else {
     history = (0, import_jsx_runtime8.jsx)("div", {
       "data-wt-history-list": true,
@@ -1478,12 +1478,12 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
             display: "flex",
             gap: 6,
             alignItems: "center",
-            background: selCommit?.hash === c.hash ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none"
+            background: selCommit?.hash === c.hash ? "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,0.06))" : "none"
           },
           children: [
             (0, import_jsx_runtime8.jsx)("span", { style: { color: "#e6b450", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flexShrink: 0 }, children: c.shortHash }),
             (0, import_jsx_runtime8.jsx)("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: c.subject }),
-            (0, import_jsx_runtime8.jsx)("span", { style: { flexShrink: 0, color: "var(--dsw-alias-text-secondary, #999)", fontSize: 11 }, children: relativeTime(c.date) })
+            (0, import_jsx_runtime8.jsx)("span", { style: { flexShrink: 0, color: "var(--dsw-alias-label-secondary, #666)", fontSize: 11 }, children: relativeTime(c.date) })
           ]
         })
       )
@@ -1499,7 +1499,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
       flexDirection: "column",
       gap: 4,
       flexShrink: 0,
-      background: "var(--dsw-alias-bg-base, #1a1a1a)"
+      background: "var(--dsw-alias-bg-base, #ffffff)"
     },
     children: [
       (0, import_jsx_runtime8.jsx)("button", {
@@ -1546,10 +1546,10 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
             style: {
               flex: "1 1 120px",
               minWidth: 100,
-              background: "var(--dsw-alias-bg-base, #141414)",
+              background: "var(--dsw-alias-bg-base, #ffffff)",
               border: "1px solid var(--dsw-alias-border-l2, #333)",
               borderRadius: 4,
-              color: "var(--dsw-alias-text-primary, #ddd)",
+              color: "var(--dsw-alias-label-primary, #1a1a1a)",
               padding: "3px 8px",
               fontSize: 12,
               outline: "none"
@@ -1560,7 +1560,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
             "data-wt-recent": true,
             title: "\u6700\u8FD1\u63D0\u4EA4\u6D88\u606F",
             onClick: () => setShowRecent((v2) => !v2),
-            style: { ...BTN2, color: "var(--dsw-alias-text-secondary, #999)" },
+            style: { ...BTN2, color: "var(--dsw-alias-label-secondary, #666)" },
             children: "\u25BE \u6700\u8FD1"
           }),
           (0, import_jsx_runtime8.jsx)("button", {
@@ -1599,14 +1599,14 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
           left: 6,
           right: 6,
           zIndex: 10,
-          background: "var(--dsw-alias-bg-float, #1f1f1f)",
+          background: "var(--dsw-alias-bg-overlay, #ffffff)",
           border: "1px solid var(--dsw-alias-border-l2, #333)",
           borderRadius: 6,
           boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
           maxHeight: 160,
           overflow: "auto"
         },
-        children: recentMessages.length === 0 ? (0, import_jsx_runtime8.jsx)("div", { style: { padding: "6px 10px", color: "var(--dsw-alias-text-secondary, #999)", fontSize: 12 }, children: "\uFF08\u6682\u65E0\u6700\u8FD1\u6D88\u606F\uFF09" }) : recentMessages.map(
+        children: recentMessages.length === 0 ? (0, import_jsx_runtime8.jsx)("div", { style: { padding: "6px 10px", color: "var(--dsw-alias-label-secondary, #666)", fontSize: 12 }, children: "\uFF08\u6682\u65E0\u6700\u8FD1\u6D88\u606F\uFF09" }) : recentMessages.map(
           (m, i) => (0, import_jsx_runtime8.jsx)("div", {
             key: i,
             "data-wt-recent-item": true,
@@ -1618,7 +1618,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
               padding: "5px 10px",
               cursor: "pointer",
               fontSize: 12,
-              color: "var(--dsw-alias-text-primary, #ddd)",
+              color: "var(--dsw-alias-label-primary, #1a1a1a)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap"
@@ -1631,14 +1631,14 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
   });
   const infoRow = (0, import_jsx_runtime8.jsx)("div", {
     "data-wt-info": true,
-    style: { display: "flex", alignItems: "center", gap: 6, padding: "2px 6px", flexShrink: 0, color: "var(--dsw-alias-text-secondary, #999)", fontSize: 12 },
+    style: { display: "flex", alignItems: "center", gap: 6, padding: "2px 6px", flexShrink: 0, color: "var(--dsw-alias-label-secondary, #666)", fontSize: 12 },
     children: [
       (0, import_jsx_runtime8.jsx)("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: `\u{1F4CC} ${branch || "detached"}` }),
       (0, import_jsx_runtime8.jsx)("button", {
         type: "button",
         "data-wt-refresh": true,
         onClick: load,
-        style: { background: "none", border: "none", cursor: "pointer", color: "var(--dsw-alias-text-secondary, #999)", fontSize: 12, padding: "2px 8px" },
+        style: { background: "none", border: "none", cursor: "pointer", color: "var(--dsw-alias-label-secondary, #666)", fontSize: 12, padding: "2px 8px" },
         children: "\u21BB \u5237\u65B0"
       })
     ]
@@ -1717,7 +1717,7 @@ function Changes({ cwd, sessionId, rpc, onCountChange }) {
           top: ctxMenu.y,
           zIndex: 40,
           minWidth: 120,
-          background: "var(--dsw-alias-bg-float, #1f1f1f)",
+          background: "var(--dsw-alias-bg-overlay, #ffffff)",
           border: "1px solid var(--dsw-alias-border-l2, #333)",
           borderRadius: 6,
           boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
@@ -11180,6 +11180,67 @@ var MIN_H2 = 120;
 var MAX_H = 480;
 var ROWS = 40;
 var COLS = 120;
+var LIGHT_ANSI = {
+  black: "#1a1a1a",
+  red: "#cd3131",
+  green: "#0c7c3d",
+  yellow: "#9e6a03",
+  blue: "#0451a5",
+  magenta: "#bc05bc",
+  cyan: "#0598bc",
+  white: "#555555",
+  brightBlack: "#666666",
+  brightRed: "#cd3131",
+  brightGreen: "#0c7c3d",
+  brightYellow: "#9e6a03",
+  brightBlue: "#0451a5",
+  brightMagenta: "#bc05bc",
+  brightCyan: "#0598bc",
+  brightWhite: "#1a1a1a"
+};
+var DARK_ANSI = {
+  black: "#2e3436",
+  red: "#cc0000",
+  green: "#4e9a06",
+  yellow: "#c4a000",
+  blue: "#3465a4",
+  magenta: "#75507b",
+  cyan: "#06989a",
+  white: "#d3d7cf",
+  brightBlack: "#555753",
+  brightRed: "#ef2929",
+  brightGreen: "#8ae234",
+  brightYellow: "#fce94f",
+  brightBlue: "#729fcf",
+  brightMagenta: "#ad7fa8",
+  brightCyan: "#34e2e2",
+  brightWhite: "#eeeeec"
+};
+function readCssVar(name2, fallback) {
+  if (typeof document === "undefined" || typeof getComputedStyle !== "function") return fallback;
+  const v2 = getComputedStyle(document.body).getPropertyValue(name2)?.trim();
+  return v2 || fallback;
+}
+function hexToRgba(hex, alpha) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
+  if (!m) return `rgba(65, 118, 230, ${alpha})`;
+  const n = parseInt(m[1], 16);
+  return `rgba(${n >> 16 & 255}, ${n >> 8 & 255}, ${n & 255}, ${alpha})`;
+}
+function buildXtermTheme() {
+  const dark = typeof document !== "undefined" && document.body?.hasAttribute("data-ds-dark-theme");
+  const bg = readCssVar("--dsw-alias-bg-base", dark ? "#141414" : "#ffffff");
+  const fg = readCssVar("--dsw-alias-label-primary", dark ? "#e6e6e6" : "#1a1a1a");
+  const accent = readCssVar("--dsw-alias-brand-primary-new-colorprimary-new-color", "#4176e6");
+  return {
+    background: bg,
+    foreground: fg,
+    cursor: accent,
+    cursorAccent: bg,
+    selectionBackground: hexToRgba(accent, 0.28),
+    ...dark ? DARK_ANSI : LIGHT_ANSI
+  };
+}
 function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
   const [height, setHeight] = (0, import_react7.useState)(280);
   const [tabs, setTabs] = (0, import_react7.useState)([]);
@@ -11221,13 +11282,21 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
       if (mountRefs.current[tab.id]) continue;
       const el2 = document.getElementById(`dshwt-term-${tab.id}`);
       if (!el2) continue;
-      const term = new Dl({ rows: ROWS, cols: COLS, fontSize: 12, theme: { background: "#141414" } });
+      const term = new Dl({ rows: ROWS, cols: COLS, fontSize: 12, theme: buildXtermTheme() });
       const fit = new o();
       term.loadAddon(fit);
       term.open(el2);
+      term.onResize(({ cols, rows }) => {
+        if (tab.ttyId) callRpc(rpc, "console.resize", { sessionId: tab.ttyId, cols, rows }).catch(() => {
+        });
+      });
       try {
         fit.fit();
       } catch {
+      }
+      if (tab.ttyId) {
+        callRpc(rpc, "console.resize", { sessionId: tab.ttyId, cols: term.cols, rows: term.rows }).catch(() => {
+        });
       }
       const ws2 = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}${WS_PATH}`);
       ws2.binaryType = "arraybuffer";
@@ -11255,6 +11324,10 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
         if (tab.ttyId) callRpc(rpc, "console.write", { sessionId: tab.ttyId, data }).catch(() => {
         });
       });
+      term.onResize(({ cols, rows }) => {
+        if (tab.ttyId) callRpc(rpc, "console.resize", { sessionId: tab.ttyId, cols, rows }).catch(() => {
+        });
+      });
       mountRefs.current[tab.id] = { term, fit, ws: ws2 };
     }
   }, [tabs, rpc]);
@@ -11266,6 +11339,16 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
         delete mountRefs.current[id];
       }
     };
+  }, []);
+  (0, import_react7.useEffect)(() => {
+    if (typeof MutationObserver === "undefined") return;
+    const update = () => {
+      const theme = buildXtermTheme();
+      for (const m of Object.values(mountRefs.current)) m.term?.setOption?.("theme", theme);
+    };
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, { attributes: true, attributeFilter: ["data-ds-dark-theme"] });
+    return () => observer.disconnect();
   }, []);
   (0, import_react7.useEffect)(() => {
     if (!open || typeof requestAnimationFrame === "undefined") return;
@@ -11339,8 +11422,8 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
       bottom: 0,
       height,
       zIndex: 12,
-      background: "#141414",
-      borderTop: "1px solid var(--dsw-alias-border-l2, #333)",
+      background: "var(--dsw-alias-bg-base, #ffffff)",
+      borderTop: "1px solid var(--dsw-alias-border-l2, #ddd)",
       display: open ? "flex" : "none",
       // 常驻渲染：收起仅隐藏，不卸载
       flexDirection: "column"
@@ -11348,9 +11431,9 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
     children: [
       (0, import_jsx_runtime9.jsx)("div", { "data-wt-console-drag": true, onMouseDown: onDragDown, style: { height: 4, cursor: "row-resize", flexShrink: 0 } }),
       (0, import_jsx_runtime9.jsx)("div", { "data-wt-console-bar": true, style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderBottom: "1px solid var(--dsw-alias-border-l2, #333)", flexShrink: 0 }, children: [
-        (0, import_jsx_runtime9.jsx)("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u63A7\u5236\u53F0" }),
+        (0, import_jsx_runtime9.jsx)("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u63A7\u5236\u53F0" }),
         (0, import_jsx_runtime9.jsx)("div", { style: { display: "flex", gap: 4, flex: 1, overflow: "auto" }, children: tabs.map(
-          (t) => (0, import_jsx_runtime9.jsx)("span", { key: t.id, "data-wt-console-tab": true, "data-active": active === t.id || void 0, onClick: () => setActive(t.id), style: { fontSize: 12, padding: "2px 10px", borderRadius: 4, cursor: "pointer", background: active === t.id ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.08))" : "none", display: "flex", gap: 6, alignItems: "center" }, children: [
+          (t) => (0, import_jsx_runtime9.jsx)("span", { key: t.id, "data-wt-console-tab": true, "data-active": active === t.id || void 0, onClick: () => setActive(t.id), style: { fontSize: 12, padding: "2px 10px", borderRadius: 4, cursor: "pointer", background: active === t.id ? "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,0.08))" : "none", display: "flex", gap: 6, alignItems: "center" }, children: [
             t.title,
             t.status === "exited" && (0, import_jsx_runtime9.jsx)("span", { style: { color: "#e06c75", fontSize: 10 }, children: "\u5DF2\u9000\u51FA" }),
             t.status === "exited" && (0, import_jsx_runtime9.jsx)("span", { role: "button", "data-wt-console-reopen": true, onClick: (e) => {
@@ -11360,11 +11443,11 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
             (0, import_jsx_runtime9.jsx)("span", { role: "button", "data-wt-console-close": true, onClick: (e) => {
               e.stopPropagation();
               closeTab(t);
-            }, style: { cursor: "pointer", color: "var(--dsw-alias-text-secondary, #999)" }, children: "\u2715" })
+            }, style: { cursor: "pointer", color: "var(--dsw-alias-label-secondary, #666)" }, children: "\u2715" })
           ] })
         ) }),
-        (0, import_jsx_runtime9.jsx)("button", { type: "button", "data-wt-console-new": true, onClick: addTab, style: { background: "none", border: "1px solid var(--dsw-alias-border-l2, #444)", borderRadius: 4, color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", fontSize: 12, padding: "0 8px" }, children: "+" }),
-        (0, import_jsx_runtime9.jsx)("button", { type: "button", "data-wt-console-collapse": true, onClick: onToggle, style: { background: "none", border: "none", cursor: "pointer", color: "var(--dsw-alias-text-secondary, #999)", fontSize: 12 }, children: "\u25BE" })
+        (0, import_jsx_runtime9.jsx)("button", { type: "button", "data-wt-console-new": true, onClick: addTab, style: { background: "none", border: "1px solid var(--dsw-alias-border-l2, #444)", borderRadius: 4, color: "var(--dsw-alias-label-secondary, #666)", cursor: "pointer", fontSize: 12, padding: "0 8px" }, children: "+" }),
+        (0, import_jsx_runtime9.jsx)("button", { type: "button", "data-wt-console-collapse": true, onClick: onToggle, style: { background: "none", border: "none", cursor: "pointer", color: "var(--dsw-alias-label-secondary, #666)", fontSize: 12 }, children: "\u25BE" })
       ] }),
       panelError && (0, import_jsx_runtime9.jsx)("div", { "data-wt-console-error": true, style: { padding: "4px 10px", color: "#e06c75", fontSize: 12, borderBottom: "1px solid var(--dsw-alias-border-l2, #333)" }, children: panelError }),
       (0, import_jsx_runtime9.jsx)("div", { style: { flex: 1, minHeight: 0, position: "relative", display: "flex" }, children: tabs.map(
@@ -11375,7 +11458,7 @@ function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
           style: { flex: 1, minWidth: 0, display: active === t.id ? "block" : "none", position: "relative", padding: 4 }
         })
       ) }),
-      tabs.length === 0 && (0, import_jsx_runtime9.jsx)("div", { style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--dsw-alias-text-secondary, #666)", fontSize: 12 }, children: "\u70B9\u51FB + \u65B0\u5EFA\u7EC8\u7AEF" })
+      tabs.length === 0 && (0, import_jsx_runtime9.jsx)("div", { style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--dsw-alias-label-secondary, #888)", fontSize: 12 }, children: "\u70B9\u51FB + \u65B0\u5EFA\u7EC8\u7AEF" })
     ]
   });
 }
@@ -11452,7 +11535,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
       display: "flex",
       zIndex: 5,
       fontSize: "13px",
-      color: "var(--dsw-alias-text-primary, #ddd)"
+      color: "var(--dsw-alias-label-primary, #1a1a1a)"
     },
     children: [
       // ── 展开态 ──
@@ -11464,7 +11547,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
           width: 4,
           flexShrink: 0,
           cursor: "col-resize",
-          background: "var(--dsw-alias-bg-float, #1f1f1f)",
+          background: "var(--dsw-alias-bg-overlay, #ffffff)",
           borderLeft: "1px solid var(--dsw-alias-border-l2, #333)"
         }
       }),
@@ -11473,7 +11556,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
         style: {
           flex: 1,
           minWidth: 0,
-          background: "var(--dsw-alias-bg-base, #1a1a1a)",
+          background: "var(--dsw-alias-bg-base, #ffffff)",
           borderLeft: "1px solid var(--dsw-alias-border-l2, #333)",
           display: "flex",
           flexDirection: "column",
@@ -11502,7 +11585,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
                   border: "none",
                   borderRight: "1px solid var(--dsw-alias-border-l2, #333)",
                   cursor: "pointer",
-                  color: "var(--dsw-alias-text-secondary, #999)",
+                  color: "var(--dsw-alias-label-secondary, #666)",
                   flexShrink: 0,
                   display: "flex",
                   alignItems: "center",
@@ -11523,8 +11606,8 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
                     border: "none",
                     cursor: "pointer",
                     fontSize: "12px",
-                    color: tab === t.id ? "var(--dsw-alias-text-primary, #fff)" : "var(--dsw-alias-text-secondary, #999)",
-                    borderBottom: tab === t.id ? "2px solid var(--dsw-alias-accent, #4f8cff)" : "2px solid transparent"
+                    color: tab === t.id ? "var(--dsw-alias-label-primary, #1a1a1a)" : "var(--dsw-alias-label-secondary, #666)",
+                    borderBottom: tab === t.id ? "2px solid var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6)" : "2px solid transparent"
                   },
                   children: t.id === "changes" && changeCount > 0 ? `\u53D8\u66F4 ${changeCount}` : t.label
                 })
@@ -11543,8 +11626,8 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
                   borderLeft: "1px solid var(--dsw-alias-border-l2, #333)",
                   cursor: "pointer",
                   fontSize: "12px",
-                  color: consoleOpen ? "var(--dsw-alias-text-primary, #fff)" : "var(--dsw-alias-text-secondary, #999)",
-                  borderBottom: consoleOpen ? "2px solid var(--dsw-alias-accent, #4f8cff)" : "2px solid transparent"
+                  color: consoleOpen ? "var(--dsw-alias-label-primary, #1a1a1a)" : "var(--dsw-alias-label-secondary, #666)",
+                  borderBottom: consoleOpen ? "2px solid var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6)" : "2px solid transparent"
                 },
                 children: "\u7EC8\u7AEF"
               })
@@ -11567,7 +11650,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
           alignItems: "center",
           paddingTop: 6,
           gap: 4,
-          background: "var(--dsw-alias-bg-float, #1f1f1f)",
+          background: "var(--dsw-alias-bg-overlay, #ffffff)",
           borderLeft: "1px solid var(--dsw-alias-border-l2, #333)"
         },
         children: [
@@ -11578,7 +11661,7 @@ function RightSidebar({ useSessions, rpc, openSession, insertIntoComposer }) {
             title: "\u5C55\u5F00\u53F3\u4FA7\u8FB9\u680F",
             "aria-label": "\u5C55\u5F00\u53F3\u4FA7\u8FB9\u680F",
             onClick: () => setOpen(true),
-            style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--dsw-alias-text-secondary, #999)" },
+            style: { width: 36, height: 36, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--dsw-alias-label-secondary, #666)" },
             children: panelIcon(true)
           }),
           (0, import_jsx_runtime10.jsx)("button", {

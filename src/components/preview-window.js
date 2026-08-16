@@ -87,7 +87,7 @@ export function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
   if (state === "error") {
     body = jsx("div", { "data-wt-preview-error": true, style: { padding: 16, color: "#e06c75" }, children: error });
   } else if (state === "loading") {
-    body = jsx("div", { "data-wt-preview-loading": true, style: { padding: 16, color: "var(--dsw-alias-text-secondary, #999)" }, children: "加载中…" });
+    body = jsx("div", { "data-wt-preview-loading": true, style: { padding: 16, color: "var(--dsw-alias-label-secondary, #666)" }, children: "加载中…" });
   } else if (kind === "image") {
     body = jsx("div", { style: { flex: 1, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }, children: jsx("img", { "data-wt-preview-image": true, src: imgUrl, alt: file, style: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 4 } }) });
   } else {
@@ -102,11 +102,11 @@ export function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
           "data-line": i,
           "data-wt-preview-line": true,
           "data-wt-match": isMatch || undefined,
-          style: { display: "flex", background: isMatch ? "rgba(230,180,80,0.28)" : "none", color: isMatch ? "#f0d59a" : undefined },
+          style: { display: "flex", background: isMatch ? "rgba(230,180,80,0.28)" : "none", color: isMatch ? "#9e6a03" : undefined },
           children: [
             jsx("span", {
               "data-wt-preview-lineno": true,
-              style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-text-secondary, #666)", paddingRight: 8, userSelect: "none" },
+              style: { width: 44, flexShrink: 0, textAlign: "right", color: "var(--dsw-alias-label-secondary, #888)", paddingRight: 8, userSelect: "none" },
               children: String(i + 1),
             }),
             jsx("span", {

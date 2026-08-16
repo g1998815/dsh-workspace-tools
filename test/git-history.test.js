@@ -1,7 +1,7 @@
 // test/git-history.test.js
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -84,7 +84,7 @@ test("resetTo: mixed 回退保留工作区改动", async () => {
     const after = await logCommits(repo.dir);
     assert.equal(after.commits.length, 1);
     assert.equal(after.commits[0].subject, "first commit");
-    const content = execFileSync("cat", [join(repo.dir, "a.txt")], { encoding: "utf8" });
+    const content = readFileSync(join(repo.dir, "a.txt"), "utf8");
     assert.match(content, /two/);
   } finally {
     repo.cleanup();

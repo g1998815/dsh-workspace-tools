@@ -21,10 +21,10 @@ const STATUS_COLOR = {
 
 // 工具行按钮基础样式（disabled 时降透明度）
 const BTN = {
-  background: "var(--dsw-alias-bg-float, #1f1f1f)",
+  background: "var(--dsw-alias-bg-overlay, #ffffff)",
   border: "1px solid var(--dsw-alias-border-l2, #444)",
   borderRadius: 4,
-  color: "var(--dsw-alias-text-primary, #ddd)",
+  color: "var(--dsw-alias-label-primary, #1a1a1a)",
   cursor: "pointer",
   padding: "2px 8px",
   fontSize: 12,
@@ -284,11 +284,11 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
   // ── 渲染：变更列表（上半区） ────────────────────────────────
   let list;
   if (status === "loading") {
-    list = jsx("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "加载中…" });
+    list = jsx("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-label-secondary, #666)" }, children: "加载中…" });
   } else if (status === "error") {
     list = jsx("div", { "data-wt-error": true, style: { padding: 12, color: "#e06c75" }, children: error });
   } else if (rows.length === 0) {
-    list = jsx("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "没有变更" });
+    list = jsx("div", { style: { padding: 12, color: "var(--dsw-alias-label-secondary, #666)" }, children: "没有变更" });
   } else {
     list = jsx("div", {
       "data-wt-changes-list": true,
@@ -302,7 +302,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
                 padding: "4px 10px",
                 fontWeight: 600,
                 cursor: "pointer",
-                color: "var(--dsw-alias-text-secondary, #999)",
+                color: "var(--dsw-alias-label-secondary, #666)",
                 display: "flex",
                 gap: 6,
                 alignItems: "center",
@@ -326,7 +326,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
                 display: "flex",
                 gap: 6,
                 alignItems: "center",
-                background: selected?.path === row.path ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none",
+                background: selected?.path === row.path ? "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,0.06))" : "none",
               },
               children: [
                 jsx("input", {
@@ -335,7 +335,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
                   checked: checked.has(row.path),
                   onChange: () => toggleChecked(row.path),
                   onClick: (e) => e.stopPropagation(), // 勾选不触发行点击（打开 diff）
-                  style: { flexShrink: 0, margin: 0, accentColor: "var(--dsw-alias-accent, #4f8cff)" },
+                  style: { flexShrink: 0, margin: 0, accentColor: "var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6)" },
                 }),
                 jsx("span", {
                   style: {
@@ -360,11 +360,11 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
   // ── 渲染：历史（下半区） ────────────────────────────────────
   let history;
   if (histStatus === "loading") {
-    history = jsx("div", { style: { padding: 10, color: "var(--dsw-alias-text-secondary, #999)" }, children: "加载历史…" });
+    history = jsx("div", { style: { padding: 10, color: "var(--dsw-alias-label-secondary, #666)" }, children: "加载历史…" });
   } else if (histStatus === "error") {
     history = jsx("div", { "data-wt-history-error": true, style: { padding: 10, color: "#e06c75" }, children: histError });
   } else if (commits.length === 0) {
-    history = jsx("div", { style: { padding: 10, color: "var(--dsw-alias-text-secondary, #999)" }, children: "没有提交记录" });
+    history = jsx("div", { style: { padding: 10, color: "var(--dsw-alias-label-secondary, #666)" }, children: "没有提交记录" });
   } else {
     history = jsx("div", {
       "data-wt-history-list": true,
@@ -389,12 +389,12 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
             display: "flex",
             gap: 6,
             alignItems: "center",
-            background: selCommit?.hash === c.hash ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none",
+            background: selCommit?.hash === c.hash ? "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,0.06))" : "none",
           },
           children: [
             jsx("span", { style: { color: "#e6b450", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flexShrink: 0 }, children: c.shortHash }),
             jsx("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: c.subject }),
-            jsx("span", { style: { flexShrink: 0, color: "var(--dsw-alias-text-secondary, #999)", fontSize: 11 }, children: relativeTime(c.date) }),
+            jsx("span", { style: { flexShrink: 0, color: "var(--dsw-alias-label-secondary, #666)", fontSize: 11 }, children: relativeTime(c.date) }),
           ],
         }),
       ),
@@ -413,7 +413,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
           flexDirection: "column",
           gap: 4,
           flexShrink: 0,
-          background: "var(--dsw-alias-bg-base, #1a1a1a)",
+          background: "var(--dsw-alias-bg-base, #ffffff)",
         },
         children: [
           jsx("button", {
@@ -464,10 +464,10 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
             style: {
               flex: "1 1 120px",
               minWidth: 100,
-              background: "var(--dsw-alias-bg-base, #141414)",
+              background: "var(--dsw-alias-bg-base, #ffffff)",
               border: "1px solid var(--dsw-alias-border-l2, #333)",
               borderRadius: 4,
-              color: "var(--dsw-alias-text-primary, #ddd)",
+              color: "var(--dsw-alias-label-primary, #1a1a1a)",
               padding: "3px 8px",
               fontSize: 12,
               outline: "none",
@@ -478,7 +478,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
             "data-wt-recent": true,
             title: "最近提交消息",
             onClick: () => setShowRecent((v) => !v),
-            style: { ...BTN, color: "var(--dsw-alias-text-secondary, #999)" },
+            style: { ...BTN, color: "var(--dsw-alias-label-secondary, #666)" },
             children: "▾ 最近",
           }),
           jsx("button", {
@@ -518,7 +518,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
             left: 6,
             right: 6,
             zIndex: 10,
-            background: "var(--dsw-alias-bg-float, #1f1f1f)",
+            background: "var(--dsw-alias-bg-overlay, #ffffff)",
             border: "1px solid var(--dsw-alias-border-l2, #333)",
             borderRadius: 6,
             boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
@@ -527,7 +527,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
           },
           children:
             recentMessages.length === 0
-              ? jsx("div", { style: { padding: "6px 10px", color: "var(--dsw-alias-text-secondary, #999)", fontSize: 12 }, children: "（暂无最近消息）" })
+              ? jsx("div", { style: { padding: "6px 10px", color: "var(--dsw-alias-label-secondary, #666)", fontSize: 12 }, children: "（暂无最近消息）" })
               : recentMessages.map((m, i) =>
                   jsx("div", {
                     key: i,
@@ -540,7 +540,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
                       padding: "5px 10px",
                       cursor: "pointer",
                       fontSize: 12,
-                      color: "var(--dsw-alias-text-primary, #ddd)",
+                      color: "var(--dsw-alias-label-primary, #1a1a1a)",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
@@ -555,14 +555,14 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
   // 顶部信息行：分支 + 刷新
   const infoRow = jsx("div", {
     "data-wt-info": true,
-    style: { display: "flex", alignItems: "center", gap: 6, padding: "2px 6px", flexShrink: 0, color: "var(--dsw-alias-text-secondary, #999)", fontSize: 12 },
+    style: { display: "flex", alignItems: "center", gap: 6, padding: "2px 6px", flexShrink: 0, color: "var(--dsw-alias-label-secondary, #666)", fontSize: 12 },
     children: [
       jsx("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: `📌 ${branch || "detached"}` }),
       jsx("button", {
         type: "button",
         "data-wt-refresh": true,
         onClick: load,
-        style: { background: "none", border: "none", cursor: "pointer", color: "var(--dsw-alias-text-secondary, #999)", fontSize: 12, padding: "2px 8px" },
+        style: { background: "none", border: "none", cursor: "pointer", color: "var(--dsw-alias-label-secondary, #666)", fontSize: 12, padding: "2px 8px" },
         children: "↻ 刷新",
       }),
     ],
@@ -647,7 +647,7 @@ export function Changes({ cwd, sessionId, rpc, onCountChange }) {
             top: ctxMenu.y,
             zIndex: 40,
             minWidth: 120,
-            background: "var(--dsw-alias-bg-float, #1f1f1f)",
+            background: "var(--dsw-alias-bg-overlay, #ffffff)",
             border: "1px solid var(--dsw-alias-border-l2, #333)",
             borderRadius: 6,
             boxShadow: "0 4px 12px rgba(0,0,0,0.4)",

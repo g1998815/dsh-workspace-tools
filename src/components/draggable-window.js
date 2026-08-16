@@ -16,7 +16,7 @@ const BTN = {
   background: "none",
   border: "1px solid var(--dsw-alias-border-l2, #444)",
   borderRadius: 4,
-  color: "var(--dsw-alias-text-secondary, #999)",
+  color: "var(--dsw-alias-label-secondary, #666)",
   cursor: "pointer",
   padding: "1px 7px",
   fontSize: 11,
@@ -127,7 +127,7 @@ export function DraggableWindow({ title, badge, width = 640, onClose, search, wt
     style: {
       position: "fixed", left: pos.x, top: pos.y, width: size.w, height: size.h,
       maxWidth: "94vw", maxHeight: "92vh", minWidth: MIN_W, minHeight: MIN_H,
-      display: "flex", flexDirection: "column", background: "var(--dsw-alias-bg-base, #1a1a1a)",
+      display: "flex", flexDirection: "column", background: "var(--dsw-alias-bg-base, #ffffff)",
       border: "1px solid var(--dsw-alias-border-l2, #333)", borderRadius: 8,
       boxShadow: "0 8px 32px rgba(0,0,0,0.5)", zIndex: 100, fontSize: 12, overflow: "hidden",
     },
@@ -138,7 +138,7 @@ export function DraggableWindow({ title, badge, width = 640, onClose, search, wt
         onMouseDown: onTitleDown,
         style: {
           display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", cursor: "move",
-          background: "var(--dsw-alias-bg-float, #1f1f1f)", borderBottom: "1px solid var(--dsw-alias-border-l2, #333)",
+          background: "var(--dsw-alias-bg-overlay, #ffffff)", borderBottom: "1px solid var(--dsw-alias-border-l2, #333)",
           flexShrink: 0, userSelect: "none",
         },
         children: [
@@ -150,7 +150,7 @@ export function DraggableWindow({ title, badge, width = 640, onClose, search, wt
             [wt.close]: true,
             onClick: onClose,
             title: "关闭（Esc）",
-            style: { marginLeft: "auto", background: "none", border: "none", color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", fontSize: 14, padding: "0 4px", flexShrink: 0 },
+            style: { marginLeft: "auto", background: "none", border: "none", color: "var(--dsw-alias-label-secondary, #666)", cursor: "pointer", fontSize: 14, padding: "0 4px", flexShrink: 0 },
             children: "✕",
           }),
         ],
@@ -170,7 +170,7 @@ export function DraggableWindow({ title, badge, width = 640, onClose, search, wt
                 if (e.key === "Enter") search.onEnter(e);
                 if (e.key === "Escape") onClose();
               },
-              style: { flex: 1, background: "var(--dsw-alias-bg-base, #141414)", border: "1px solid var(--dsw-alias-border-l2, #333)", borderRadius: 4, color: "var(--dsw-alias-text-primary, #ddd)", padding: "3px 8px", fontSize: 12, outline: "none" },
+              style: { flex: 1, background: "var(--dsw-alias-bg-base, #ffffff)", border: "1px solid var(--dsw-alias-border-l2, #333)", borderRadius: 4, color: "var(--dsw-alias-label-primary, #1a1a1a)", padding: "3px 8px", fontSize: 12, outline: "none" },
             }),
             hasQuery && jsx("button", { type: "button", [wt.prev]: true, onClick: search.onPrev, style: BTN, children: "↑" }),
             hasQuery && jsx("button", { type: "button", [wt.next]: true, onClick: search.onNext, style: BTN, children: "↓" }),
@@ -186,7 +186,7 @@ export function DraggableWindow({ title, badge, width = 640, onClose, search, wt
         style: {
           position: "absolute", right: 0, bottom: 0, width: 16, height: 16,
           cursor: "nwse-resize", flexShrink: 0, zIndex: 2,
-          background: "linear-gradient(135deg, transparent 50%, var(--dsw-alias-text-secondary, #555) 50%)",
+          background: "linear-gradient(135deg, transparent 50%, var(--dsw-alias-label-secondary, #888) 50%)",
           backgroundSize: "10px 10px", backgroundRepeat: "no-repeat",
           backgroundPosition: "bottom right", opacity: 0.6,
         },

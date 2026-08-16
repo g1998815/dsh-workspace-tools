@@ -22,6 +22,54 @@ const MAX_H = 480;
 const ROWS = 40;
 const COLS = 120;
 
+// ── 主题（M5-W 修复，2026-08-16）：xterm 配色跟随 DSH 主题 ──────────────
+// DSH 主题 token（dsh-client-ui-theme/design-platform.css）：light 定义在 body，
+// dark 覆盖在 body[data-ds-dark-theme]；核心变量 --dsw-alias-bg-base（背景）、
+// --dsw-alias-label-primary（前景）、--dsw-alias-brand-primary-new-colorprimary-new-color（品牌蓝）。
+// 这里在渲染时读 getComputedStyle 构造 xterm theme，并在 body 属性变化时热更新。
+const LIGHT_ANSI = {
+  black: "#1a1a1a", red: "#cd3131", green: "#0c7c3d", yellow: "#9e6a03",
+  blue: "#0451a5", magenta: "#bc05bc", cyan: "#0598bc", white: "#555555",
+  brightBlack: "#666666", brightRed: "#cd3131", brightGreen: "#0c7c3d",
+  brightYellow: "#9e6a03", brightBlue: "#0451a5", brightMagenta: "#bc05bc",
+  brightCyan: "#0598bc", brightWhite: "#1a1a1a",
+};
+const DARK_ANSI = {
+  black: "#2e3436", red: "#cc0000", green: "#4e9a06", yellow: "#c4a000",
+  blue: "#3465a4", magenta: "#75507b", cyan: "#06989a", white: "#d3d7cf",
+  brightBlack: "#555753", brightRed: "#ef2929", brightGreen: "#8ae234", brightYellow: "#fce94f",
+  brightBlue: "#729fcf", brightMagenta: "#ad7fa8", brightCyan: "#34e2e2", brightWhite: "#eeeeec",
+};
+
+function readCssVar(name, fallback) {
+  if (typeof document === "undefined" || typeof getComputedStyle !== "function") return fallback;
+  const v = getComputedStyle(document.body).getPropertyValue(name)?.trim();
+  return v || fallback;
+}
+
+function hexToRgba(hex, alpha) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
+  if (!m) return `rgba(65, 118, 230, ${alpha})`;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+// 构造 xterm theme：背景/前景/cursor 取 DSH 变量，ANSI 16 色按明暗主题选配套
+export function buildXtermTheme() {
+  const dark = typeof document !== "undefined" && document.body?.hasAttribute("data-ds-dark-theme");
+  const bg = readCssVar("--dsw-alias-bg-base", dark ? "#141414" : "#ffffff");
+  const fg = readCssVar("--dsw-alias-label-primary", dark ? "#e6e6e6" : "#1a1a1a");
+  const accent = readCssVar("--dsw-alias-brand-primary-new-colorprimary-new-color", "#4176e6");
+  return {
+    background: bg,
+    foreground: fg,
+    cursor: accent,
+    cursorAccent: bg,
+    selectionBackground: hexToRgba(accent, 0.28),
+    ...(dark ? DARK_ANSI : LIGHT_ANSI),
+  };
+}
+
 // 设计修正（Step 2 注）：面板**常驻渲染**，open 只控制 style.display（展开 flex / 收起 none），
 // 收起不卸载组件、不 kill 会话——标签与 PTY 会话保留，重开立即恢复；组件卸载时才 dispose 全部。
 export function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
@@ -68,11 +116,21 @@ export function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
       if (mountRefs.current[tab.id]) continue; // 已挂
       const el = document.getElementById(`dshwt-term-${tab.id}`);
       if (!el) continue;
-      const term = new Terminal({ rows: ROWS, cols: COLS, fontSize: 12, theme: { background: "#141414" } });
+      const term = new Terminal({ rows: ROWS, cols: COLS, fontSize: 12, theme: buildXtermTheme() });
       const fit = new FitAddon();
       term.loadAddon(fit);
       term.open(el);
+      // M5-W：resize 同步必须先于 fit 注册——fit.fit() 会触发首个 resize 事件，
+      // 若 onResize 在其后才注册，事件丢失 → PTY 停留在 spawn 尺寸（40×120）而 xterm
+      // 已 fit 到实际尺寸，PSReadLine 按错误行列重绘（历史导航不自动清除、输入拼接）。
+      term.onResize(({ cols, rows }) => {
+        if (tab.ttyId) callRpc(rpc, "console.resize", { sessionId: tab.ttyId, cols, rows }).catch(() => {});
+      });
       try { fit.fit(); } catch { /* 忽略 */ }
+      // fit 后主动同步一次当前尺寸（覆盖首个 resize 事件已在注册前触发的情形）
+      if (tab.ttyId) {
+        callRpc(rpc, "console.resize", { sessionId: tab.ttyId, cols: term.cols, rows: term.rows }).catch(() => {});
+      }
       const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}${WS_PATH}`);
       ws.binaryType = "arraybuffer";
       ws.onopen = () => {
@@ -99,6 +157,11 @@ export function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
         // console.write 的 payload 键是 sessionId（ttyId 复用同键），不传 cwd（端点只读 sessions Map）
         if (tab.ttyId) callRpc(rpc, "console.write", { sessionId: tab.ttyId, data }).catch(() => {});
       });
+      // M5-W：xterm 实际尺寸（fit 后）同步给 PTY——PSReadLine 按真实行列重绘，
+      // 修复历史导航（↑/↓）时重绘错位/不自动清除。POSIX 端无 resize API 时静默忽略。
+      term.onResize(({ cols, rows }) => {
+        if (tab.ttyId) callRpc(rpc, "console.resize", { sessionId: tab.ttyId, cols, rows }).catch(() => {});
+      });
       mountRefs.current[tab.id] = { term, fit, ws };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -113,6 +176,18 @@ export function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
         delete mountRefs.current[id];
       }
     };
+  }, []);
+
+  // 主题跟随（M5-W 修复）：DSH 主题切换（body[data-ds-dark-theme]）时热更新所有 xterm
+  useEffect(() => {
+    if (typeof MutationObserver === "undefined") return;
+    const update = () => {
+      const theme = buildXtermTheme();
+      for (const m of Object.values(mountRefs.current)) m.term?.setOption?.("theme", theme);
+    };
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, { attributes: true, attributeFilter: ["data-ds-dark-theme"] });
+    return () => observer.disconnect();
   }, []);
 
   // 重新展开或切换标签时重算尺寸（收起 display:none 期间尺寸为 0；隐藏标签切回时同样需要 re-fit）
@@ -187,24 +262,24 @@ export function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
     "data-wt-console": true,
     style: {
       position: "fixed", left: 0, right: 0, bottom: 0, height, zIndex: 12,
-      background: "#141414", borderTop: "1px solid var(--dsw-alias-border-l2, #333)",
+      background: "var(--dsw-alias-bg-base, #ffffff)", borderTop: "1px solid var(--dsw-alias-border-l2, #ddd)",
       display: open ? "flex" : "none", // 常驻渲染：收起仅隐藏，不卸载
       flexDirection: "column",
     },
     children: [
       jsx("div", { "data-wt-console-drag": true, onMouseDown: onDragDown, style: { height: 4, cursor: "row-resize", flexShrink: 0 } }),
       jsx("div", { "data-wt-console-bar": true, style: { display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderBottom: "1px solid var(--dsw-alias-border-l2, #333)", flexShrink: 0 }, children: [
-        jsx("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--dsw-alias-text-secondary, #999)" }, children: "控制台" }),
+        jsx("span", { style: { fontSize: 12, fontWeight: 600, color: "var(--dsw-alias-label-secondary, #666)" }, children: "控制台" }),
         jsx("div", { style: { display: "flex", gap: 4, flex: 1, overflow: "auto" }, children: tabs.map((t) =>
-          jsx("span", { key: t.id, "data-wt-console-tab": true, "data-active": active === t.id || undefined, onClick: () => setActive(t.id), style: { fontSize: 12, padding: "2px 10px", borderRadius: 4, cursor: "pointer", background: active === t.id ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.08))" : "none", display: "flex", gap: 6, alignItems: "center" }, children: [
+          jsx("span", { key: t.id, "data-wt-console-tab": true, "data-active": active === t.id || undefined, onClick: () => setActive(t.id), style: { fontSize: 12, padding: "2px 10px", borderRadius: 4, cursor: "pointer", background: active === t.id ? "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,0.08))" : "none", display: "flex", gap: 6, alignItems: "center" }, children: [
             t.title,
             t.status === "exited" && jsx("span", { style: { color: "#e06c75", fontSize: 10 }, children: "已退出" }),
             t.status === "exited" && jsx("span", { role: "button", "data-wt-console-reopen": true, onClick: (e) => { e.stopPropagation(); reopen(); }, style: { color: "#98c379", fontSize: 10, cursor: "pointer" }, children: "重开" }),
-            jsx("span", { role: "button", "data-wt-console-close": true, onClick: (e) => { e.stopPropagation(); closeTab(t); }, style: { cursor: "pointer", color: "var(--dsw-alias-text-secondary, #999)" }, children: "✕" }),
+            jsx("span", { role: "button", "data-wt-console-close": true, onClick: (e) => { e.stopPropagation(); closeTab(t); }, style: { cursor: "pointer", color: "var(--dsw-alias-label-secondary, #666)" }, children: "✕" }),
           ]}),
         )}) ,
-        jsx("button", { type: "button", "data-wt-console-new": true, onClick: addTab, style: { background: "none", border: "1px solid var(--dsw-alias-border-l2, #444)", borderRadius: 4, color: "var(--dsw-alias-text-secondary, #999)", cursor: "pointer", fontSize: 12, padding: "0 8px" }, children: "+" }),
-        jsx("button", { type: "button", "data-wt-console-collapse": true, onClick: onToggle, style: { background: "none", border: "none", cursor: "pointer", color: "var(--dsw-alias-text-secondary, #999)", fontSize: 12 }, children: "▾" }),
+        jsx("button", { type: "button", "data-wt-console-new": true, onClick: addTab, style: { background: "none", border: "1px solid var(--dsw-alias-border-l2, #444)", borderRadius: 4, color: "var(--dsw-alias-label-secondary, #666)", cursor: "pointer", fontSize: 12, padding: "0 8px" }, children: "+" }),
+        jsx("button", { type: "button", "data-wt-console-collapse": true, onClick: onToggle, style: { background: "none", border: "none", cursor: "pointer", color: "var(--dsw-alias-label-secondary, #666)", fontSize: 12 }, children: "▾" }),
       ] }),
       panelError && jsx("div", { "data-wt-console-error": true, style: { padding: "4px 10px", color: "#e06c75", fontSize: 12, borderBottom: "1px solid var(--dsw-alias-border-l2, #333)" }, children: panelError }),
       jsx("div", { style: { flex: 1, minHeight: 0, position: "relative", display: "flex" }, children: tabs.map((t) =>
@@ -215,7 +290,7 @@ export function ConsolePanel({ cwd, sessionId, rpc, open, onToggle }) {
           style: { flex: 1, minWidth: 0, display: active === t.id ? "block" : "none", position: "relative", padding: 4 },
         }),
       ) }),
-      tabs.length === 0 && jsx("div", { style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--dsw-alias-text-secondary, #666)", fontSize: 12 }, children: "点击 + 新建终端" }),
+      tabs.length === 0 && jsx("div", { style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--dsw-alias-label-secondary, #888)", fontSize: 12 }, children: "点击 + 新建终端" }),
     ],
   });
 }

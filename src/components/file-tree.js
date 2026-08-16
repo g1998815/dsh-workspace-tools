@@ -151,9 +151,9 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
 
   let body;
   if (!cwd) {
-    body = jsx("div", { style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "当前会话没有工作目录" });
+    body = jsx("div", { style: { padding: 12, color: "var(--dsw-alias-label-secondary, #666)" }, children: "当前会话没有工作目录" });
   } else if (!root || root.status === "loading") {
-    body = jsx("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-text-secondary, #999)" }, children: "加载中…" });
+    body = jsx("div", { "data-wt-loading": true, style: { padding: 12, color: "var(--dsw-alias-label-secondary, #666)" }, children: "加载中…" });
   } else if (root.status === "error") {
     body = jsx("div", { "data-wt-error": true, style: { padding: 12, color: "#e06c75" }, children: root.error });
   } else {
@@ -191,7 +191,7 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
               paddingLeft: 8 + row.depth * 14,
               cursor: "pointer",
               whiteSpace: "nowrap",
-              background: selected === row.rel ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none",
+              background: selected === row.rel ? "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,0.06))" : "none",
             },
             children: [
               jsx("span", { style: { width: 14, flexShrink: 0, display: "inline-block", textAlign: "center" }, children: row.isDir ? (isOpen ? "▾" : "▸") : "" }),
@@ -231,7 +231,7 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
           background: "transparent",
           border: "none",
           borderBottom: "1px solid var(--dsw-alias-border-l2, #333)",
-          color: "var(--dsw-alias-text-primary, #ddd)",
+          color: "var(--dsw-alias-label-primary, #1a1a1a)",
           outline: "none",
           fontSize: 12,
         },
@@ -247,7 +247,7 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
             top: menu.y,
             zIndex: 30,
             minWidth: 150,
-            background: "var(--dsw-alias-bg-float, #1f1f1f)",
+            background: "var(--dsw-alias-bg-overlay, #ffffff)",
             border: "1px solid var(--dsw-alias-border-l2, #333)",
             borderRadius: 6,
             boxShadow: "0 4px 12px rgba(0,0,0,0.4)",

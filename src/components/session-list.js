@@ -27,7 +27,7 @@ export function SessionList({ useSessions, openSession }) {
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
-          background: active ? "var(--dsw-alias-fill-hover, rgba(255,255,255,0.06))" : "none",
+          background: active ? "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,0.06))" : "none",
         },
         children: s?.displayTitle ?? id,
       });
