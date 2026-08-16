@@ -438,7 +438,7 @@ function DraggableWindow({ title, badge, width = 640, onClose, search, wtPrefix 
 var WINDOW_W = 960;
 var TOKEN_COLORS = { str: "#7ec699", com: "#6a737d", kw: "#61afef", num: "#e6b450" };
 var MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", bmp: "image/bmp", ico: "image/x-icon", avif: "image/avif" };
-function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
+function PreviewWindow({ file, cwd, sessionId, rpc, onClose, insertIntoComposer }) {
   const kind = previewKind(file);
   const ext = file.includes(".") ? file.split(".").pop().toLowerCase() : "";
   const [state, setState] = (0, import_react2.useState)("loading");
@@ -447,7 +447,76 @@ function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
   const [imgUrl, setImgUrl] = (0, import_react2.useState)(null);
   const [query, setQuery] = (0, import_react2.useState)("");
   const [matchIdx, setMatchIdx] = (0, import_react2.useState)(0);
+  const [selection, setSelection] = (0, import_react2.useState)(null);
+  const [menu, setMenu] = (0, import_react2.useState)(null);
   const bodyRef = (0, import_react2.useRef)(null);
+  const menuRef = (0, import_react2.useRef)(null);
+  (0, import_react2.useEffect)(() => {
+    if (!menu) return void 0;
+    const onDown = (ev) => {
+      if (menuRef.current && !menuRef.current.contains(ev.target)) setMenu(null);
+    };
+    const onKey = (ev) => {
+      if (ev.key === "Escape") setMenu(null);
+    };
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
+  const onMouseUp = (0, import_react2.useCallback)(() => {
+    if (typeof window === "undefined") return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    const locate = (container, offset) => {
+      const node = container.nodeType === 3 ? container : container.childNodes[offset] ?? container;
+      let el2 = node.nodeType === 3 ? node.parentElement : node;
+      let lineEl = el2;
+      while (lineEl && !lineEl.hasAttribute("data-line")) lineEl = lineEl.parentElement;
+      if (!lineEl) return null;
+      const line = Number(lineEl.getAttribute("data-line")) + 1;
+      let col = 1;
+      let span = el2;
+      while (span && !span.hasAttribute("data-col")) span = span.parentElement;
+      if (span && span.hasAttribute("data-col")) {
+        col = Number(span.getAttribute("data-col"));
+        if (node.nodeType === 3) col += node.nodeValue.slice(0, offset).length;
+      } else if (node.nodeType === 3) {
+        col = 1 + node.nodeValue.slice(0, offset).length;
+      } else {
+        col = 1;
+      }
+      return { line, col };
+    };
+    const start = locate(range.startContainer, range.startOffset);
+    const end = locate(range.endContainer, range.endOffset);
+    if (!start || !end) return;
+    const less = (p, q2) => p.line < q2.line || p.line === q2.line && p.col <= q2.col;
+    const [s15, e] = less(start, end) ? [start, end] : [end, start];
+    setSelection({ sl: s15.line, sc: s15.col, el: e.line, ec: e.col });
+  }, []);
+  const onContextMenu = (0, import_react2.useCallback)(
+    (ev) => {
+      if (!selection) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      setMenu({ x: ev.clientX, y: ev.clientY });
+    },
+    [selection]
+  );
+  const sendSelection = (0, import_react2.useCallback)(() => {
+    if (!selection || !insertIntoComposer || !sessionId) {
+      setMenu(null);
+      return;
+    }
+    const { sl: sl2, sc: sc2, el: el2, ec: ec2 } = selection;
+    const text = `${file}:${sl2}:${sc2}-${el2}:${ec2}`;
+    insertIntoComposer(sessionId, text);
+    setMenu(null);
+  }, [selection, insertIntoComposer, sessionId, file]);
   (0, import_react2.useEffect)(() => {
     let cancelled = false;
     setState("loading");
@@ -515,9 +584,13 @@ function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
     body = (0, import_jsx_runtime3.jsx)("div", {
       ref: bodyRef,
       "data-wt-preview-text": true,
-      style: { flex: 1, overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "12px", padding: "4px 10px 12px", whiteSpace: "pre" },
+      onMouseUp,
+      onContextMenu,
+      style: { flex: 1, overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "12px", padding: "4px 10px 12px", whiteSpace: "pre", userSelect: "text" },
       children: textLines.map((t, i) => {
         const isMatch = matches.includes(i);
+        let colAcc = 1;
+        const toks = tokenize(t || " ", ext);
         return (0, import_jsx_runtime3.jsx)("div", {
           key: i,
           "data-line": i,
@@ -531,9 +604,11 @@ function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
               children: String(i + 1)
             }),
             (0, import_jsx_runtime3.jsx)("span", {
-              children: tokenize(t || " ", ext).map(
-                (tok, j2) => tok.cls ? (0, import_jsx_runtime3.jsx)("span", { key: j2, style: { color: TOKEN_COLORS[tok.cls] }, children: tok.text }) : tok.text
-              )
+              children: toks.map((tok, j2) => {
+                const startCol = colAcc;
+                colAcc += tok.text.length;
+                return tok.cls ? (0, import_jsx_runtime3.jsx)("span", { key: j2, "data-col": startCol, style: { color: TOKEN_COLORS[tok.cls] }, children: tok.text }) : (0, import_jsx_runtime3.jsx)("span", { key: j2, "data-col": startCol, children: tok.text });
+              })
             })
           ]
         });
@@ -560,7 +635,39 @@ function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
       count,
       active: hasQuery
     } : void 0,
-    children: body
+    children: [
+      body,
+      // 右键菜单：发送到对话框（只发文件名+行列范围，不发内容）
+      menu && (0, import_jsx_runtime3.jsx)("div", {
+        ref: menuRef,
+        "data-wt-preview-menu": true,
+        style: {
+          position: "fixed",
+          left: menu.x,
+          top: menu.y,
+          zIndex: 110,
+          minWidth: 180,
+          background: "var(--dsw-alias-bg-overlay, #1f1f1f)",
+          border: "1px solid var(--dsw-alias-border-l2, #333)",
+          borderRadius: 6,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+          padding: 4
+        },
+        children: [
+          (0, import_jsx_runtime3.jsx)("div", {
+            role: "menuitem",
+            "data-wt-preview-send": true,
+            onClick: sendSelection,
+            style: { padding: "6px 10px", cursor: "pointer", borderRadius: 4 },
+            children: "\u53D1\u9001\u5230\u5BF9\u8BDD\u6846"
+          }),
+          selection && (0, import_jsx_runtime3.jsx)("div", {
+            style: { padding: "4px 10px", color: "var(--dsw-alias-label-secondary, #888)", fontSize: 11, borderTop: "1px solid var(--dsw-alias-border-l2, #333)" },
+            children: `${file}:${selection.sl}:${selection.sc}-${selection.el}:${selection.ec}`
+          })
+        ]
+      })
+    ]
   });
 }
 
@@ -817,6 +924,7 @@ function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
         cwd,
         sessionId,
         rpc,
+        insertIntoComposer,
         onClose: () => setPreview(null)
       })
     ]

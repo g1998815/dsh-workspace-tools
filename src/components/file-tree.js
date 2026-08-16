@@ -283,6 +283,7 @@ export function FileTree({ cwd, sessionId, rpc, insertIntoComposer }) {
           cwd,
           sessionId,
           rpc,
+          insertIntoComposer,
           onClose: () => setPreview(null),
         }),
     ],

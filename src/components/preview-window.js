@@ -16,7 +16,7 @@ const TOKEN_COLORS = { str: "#7ec699", com: "#6a737d", kw: "#61afef", num: "#e6b
 
 const MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", bmp: "image/bmp", ico: "image/x-icon", avif: "image/avif" };
 
-export function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
+export function PreviewWindow({ file, cwd, sessionId, rpc, onClose, insertIntoComposer }) {
   const kind = previewKind(file);
   const ext = file.includes(".") ? file.split(".").pop().toLowerCase() : "";
   const [state, setState] = useState("loading"); // loading | ready | error
@@ -25,7 +25,87 @@ export function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
   const [imgUrl, setImgUrl] = useState(null);
   const [query, setQuery] = useState("");
   const [matchIdx, setMatchIdx] = useState(0);
+  const [selection, setSelection] = useState(null); // {sl, sc, el, ec} 1-based 行列范围
+  const [menu, setMenu] = useState(null); // {x, y}
   const bodyRef = useRef(null);
+  const menuRef = useRef(null);
+
+  // 右键菜单：外部点击/Escape 关闭
+  useEffect(() => {
+    if (!menu) return undefined;
+    const onDown = (ev) => {
+      if (menuRef.current && !menuRef.current.contains(ev.target)) setMenu(null);
+    };
+    const onKey = (ev) => {
+      if (ev.key === "Escape") setMenu(null);
+    };
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
+
+  // 鼠标抬起：计算选中范围（起止行列，1-based）。反向选择自动归一。
+  const onMouseUp = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    // 由 DOM 节点 + 节点内偏移 → {line, col}（1-based）。节点向上找行 div(data-line)
+    // 与 token span(data-col)；节点内偏移计入列。行号 = data-line+1。
+    const locate = (container, offset) => {
+      const node = container.nodeType === 3 ? container : container.childNodes[offset] ?? container;
+      let el = node.nodeType === 3 ? node.parentElement : node;
+      let lineEl = el;
+      while (lineEl && !lineEl.hasAttribute("data-line")) lineEl = lineEl.parentElement;
+      if (!lineEl) return null;
+      const line = Number(lineEl.getAttribute("data-line")) + 1;
+      let col = 1;
+      let span = el;
+      while (span && !span.hasAttribute("data-col")) span = span.parentElement;
+      if (span && span.hasAttribute("data-col")) {
+        col = Number(span.getAttribute("data-col"));
+        if (node.nodeType === 3) col += node.nodeValue.slice(0, offset).length;
+      } else if (node.nodeType === 3) {
+        col = 1 + node.nodeValue.slice(0, offset).length;
+      } else {
+        // 容器本身（无 span/文本）：按子节点个数粗估列（少见）
+        col = 1;
+      }
+      return { line, col };
+    };
+    const start = locate(range.startContainer, range.startOffset);
+    const end = locate(range.endContainer, range.endOffset);
+    if (!start || !end) return;
+    const less = (p, q) => p.line < q.line || (p.line === q.line && p.col <= q.col);
+    const [s, e] = less(start, end) ? [start, end] : [end, start];
+    setSelection({ sl: s.line, sc: s.col, el: e.line, ec: e.col });
+  }, []);
+
+  // 右键：有选区才弹菜单（发送到对话框），否则不拦截
+  const onContextMenu = useCallback(
+    (ev) => {
+      if (!selection) return; // 无选区：保留默认右键
+      ev.preventDefault();
+      ev.stopPropagation();
+      setMenu({ x: ev.clientX, y: ev.clientY });
+    },
+    [selection],
+  );
+
+  // 发送到对话框：只发文件名 + 行列范围，不发内容
+  const sendSelection = useCallback(() => {
+    if (!selection || !insertIntoComposer || !sessionId) {
+      setMenu(null);
+      return;
+    }
+    const { sl, sc, el, ec } = selection;
+    const text = `${file}:${sl}:${sc}-${el}:${ec}`;
+    insertIntoComposer(sessionId, text);
+    setMenu(null);
+  }, [selection, insertIntoComposer, sessionId, file]);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,9 +174,14 @@ export function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
     body = jsx("div", {
       ref: bodyRef,
       "data-wt-preview-text": true,
-      style: { flex: 1, overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "12px", padding: "4px 10px 12px", whiteSpace: "pre" },
+      onMouseUp,
+      onContextMenu,
+      style: { flex: 1, overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "12px", padding: "4px 10px 12px", whiteSpace: "pre", userSelect: "text" },
       children: textLines.map((t, i) => {
         const isMatch = matches.includes(i);
+        // 累积列号：每个 token span 记 data-col（1-based 起始列），供选区行列计算
+        let colAcc = 1;
+        const toks = tokenize(t || " ", ext);
         return jsx("div", {
           key: i,
           "data-line": i,
@@ -110,11 +195,13 @@ export function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
               children: String(i + 1),
             }),
             jsx("span", {
-              children: tokenize(t || " ", ext).map((tok, j) =>
-                tok.cls
-                  ? jsx("span", { key: j, style: { color: TOKEN_COLORS[tok.cls] }, children: tok.text })
-                  : tok.text,
-              ),
+              children: toks.map((tok, j) => {
+                const startCol = colAcc;
+                colAcc += tok.text.length;
+                return tok.cls
+                  ? jsx("span", { key: j, "data-col": startCol, style: { color: TOKEN_COLORS[tok.cls] }, children: tok.text })
+                  : jsx("span", { key: j, "data-col": startCol, children: tok.text });
+              }),
             }),
           ],
         });
@@ -145,6 +232,40 @@ export function PreviewWindow({ file, cwd, sessionId, rpc, onClose }) {
           active: hasQuery,
         }
       : undefined,
-    children: body,
+    children: [
+      body,
+      // 右键菜单：发送到对话框（只发文件名+行列范围，不发内容）
+      menu &&
+        jsx("div", {
+          ref: menuRef,
+          "data-wt-preview-menu": true,
+          style: {
+            position: "fixed",
+            left: menu.x,
+            top: menu.y,
+            zIndex: 110,
+            minWidth: 180,
+            background: "var(--dsw-alias-bg-overlay, #1f1f1f)",
+            border: "1px solid var(--dsw-alias-border-l2, #333)",
+            borderRadius: 6,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+            padding: 4,
+          },
+          children: [
+            jsx("div", {
+              role: "menuitem",
+              "data-wt-preview-send": true,
+              onClick: sendSelection,
+              style: { padding: "6px 10px", cursor: "pointer", borderRadius: 4 },
+              children: "发送到对话框",
+            }),
+            selection &&
+              jsx("div", {
+                style: { padding: "4px 10px", color: "var(--dsw-alias-label-secondary, #888)", fontSize: 11, borderTop: "1px solid var(--dsw-alias-border-l2, #333)" },
+                children: `${file}:${selection.sl}:${selection.sc}-${selection.el}:${selection.ec}`,
+              }),
+          ],
+        }),
+    ],
   });
 }
