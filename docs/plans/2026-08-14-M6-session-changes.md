@@ -24,23 +24,29 @@
 ## 数据结构（host 内存，`lib/services/session-changes.js`）
 
 ```js
-// 记录（不可变）：一次 write/edit 工具调用 → 一条（仅保留 pending 状态）
+// 记录（不可变）：一次 write/edit 工具调用 → 一条
 { callId, tool: "write"|"edit", file: displayPath, abs: processPath,
   before: string|null /* null=文件原本不存在（新增） */, after: string,
   sessionId, step: number, at: epochMs }
 
-// store：Map<sessionId, Array<Record>>；按 step 升序
+// store：
+//   pending:  Map<sessionId, Array<Record>>  —— 未处理（步骤升序）
+//   processed: Map<sessionId, Array<{rec, action: "adopted"|"reverted", handledAt}>> —— 已处理历史
 ```
 
-> **用户裁定（2026-08-16）**：**已采用/已撤回的记录直接删除**，不保留历史——`adopt`/`revert` 成功后从 store 移除该记录（幂等：对不存在记录操作返回 ok）。store 内只存在"未处理"（pending）记录。撤回动作本身是 host 直接写文件（不走工具），不会形成新记录循环。
+> **用户裁定（2026-08-16，两轮）**：
+> 1. 已采用/已撤回记录**不在待处理列表展示**——`adopt`/`revert` 后从 pending 移出。
+> 2. 新增**已处理历史**：操作过的记录进入 processed 历史区（tab 下方展示），**每会话最多保留 10 条**（超出丢弃最旧）；提供**清除**按钮（清空该会话历史）。撤回动作本身是 host 直接写文件（不走工具），不会形成新记录循环。
 
 ## RPC 端点（`lib/index.js` 追加，沿用 `(endpoint,payload)` 信封 + guardCwd）
 
 | 端点 | payload | 返回 |
 |---|---|---|
 | `sessionChanges.list` | `{sessionId, cwd}` | `{items: Record[]}`（当前会话**全部 pending** 记录） |
-| `sessionChanges.adopt` | `{sessionId, cwd, callId}` | `{ok:true}`；记录删除（幂等） |
-| `sessionChanges.revert` | `{sessionId, cwd, callId}` | `{ok:true}`；写回 before（新增文件→`fs.rm`）后删除记录（幂等）；失败结构化错误 |
+| `sessionChanges.history` | `{sessionId, cwd}` | `{items: Array<{rec, action, handledAt}>}`（当前会话已处理历史，≤10） |
+| `sessionChanges.clearHistory` | `{sessionId, cwd}` | `{ok:true}`；清空该会话历史 |
+| `sessionChanges.adopt` | `{sessionId, cwd, callId}` | `{ok:true}`；pending → 移入 processed（action="adopted"，截断 10） |
+| `sessionChanges.revert` | `{sessionId, cwd, callId}` | `{ok:true}`；写回 before（新增文件→`fs.rm`）→ 移入 processed（action="reverted"，截断 10）；失败结构化错误 |
 
 > `revert` 后记录 status → "reverted"；再次操作幂等。撤回动作本身是文件修改（下次 write/edit 会再捕获为新记录，符合"撤回反映到 git 变更"）。
 
@@ -55,17 +61,19 @@
 
 **Interfaces:**
 - Produces:
-  - `createSessionChangesStore()` → `{ list(sessionId), push(sessionId, rec), find(sessionId, callId), remove(sessionId, callId) }`
+  - `createSessionChangesStore()` → `{ list(sessionId), push(sessionId, rec), find(sessionId, callId), adopt(sessionId, callId), history(sessionId), clearHistory(sessionId) }`
   - `captureIntents(ctx, store)`：注册 write/edit-intent 监听（读 before，记 pending by callId）
   - `captureResults(ctx, store)`：注册 tools/result 监听（匹配 pending → 组装 Record → push）
-  - `revertRecord(store, sessionId, callId, { fs, path })`：写回/删除；成功后 `remove`
+  - `revertRecord(store, sessionId, callId, { fs, path })`：写回/删除；成功后 `adopt`-式移入 processed（action="reverted"）
 - Consumes: `ctx.waterfall` / `ctx.on` / `ctx.fs`（readText/processPath）、`node:fs/promises`（rm）。
 
 - [ ] **Step 1: 写失败测试（纯逻辑）**
 
 ```js
 // test/session-changes.test.js —— 记录模型/组装/删除语义（无 Node 依赖的纯函数优先）
-// 用例：push+list 顺序；同文件多次 → 多条；step 自增；remove 幂等；
+// 用例：push+list 顺序；同文件多次 → 多条；step 自增；
+//      adopt/revert → pending 移出、processed 追加（action 正确）；processed 上限 10（超出丢最旧）；
+//      clearHistory 清空；幂等（重复操作不存在记录返回 ok）；
 //      revertRecord 语义（before null → 删除；before 文本 → 写回）用 fake fs 验证。
 ```
 
@@ -118,17 +126,19 @@ git commit -m "feat: session-changes capture layer (write/edit intents + tools/r
   - `SessionChanges({ cwd, sessionId, rpc, onCountChange })`：
     - 加载 `sessionChanges.list` → 当前会话 pending 记录（步骤升序）
     - 每条：文件名 + 时间 + 工具；展开 → before/after diff 视图（复用 DiffLines 或简单双栏；无 diff 时显示文件内容变化摘要）
-    - 按钮：**采用**、**撤回**（操作成功 → 本地移除该条 + `onCountChange` 更新计数）
+    - 按钮：**采用**、**撤回**（操作成功 → 该条移出 pending 列表 + `onCountChange` 更新计数）
     - `onCountChange(n)`：把当前 pending 条数回传父组件 → tab 标题显示
+    - **已处理历史区（tab 下方）**：加载 `sessionChanges.history`（≤10 条，倒序显示）；每条显示 action 徽标（已采用/已撤回）+ 文件名 + 时间；**清除**按钮 → `clearHistory` 后清空本地列表
   - 空态：无 pending 时显示"没有待处理的会话变更"（此时标题不带数字）
 - Consumes: `callRpc`、`DiffLines`、时间格式化（git-history-client 的 relativeTime 或本地）。
 
 - [ ] **Step 1: 写 SessionChanges 组件**（结构契约）
 
 ```js
-// 加载 → 列表 → 展开/收起 → 操作按钮（采用/撤回）
+// 加载 → 列表 → 展开/收起 → 操作按钮（采用/撤回）→ 下方已处理历史区（≤10 条 + 清除按钮）
 // 标记：data-wt-sesschg（根）、data-wt-sesschg-item、data-wt-sesschg-adopt、
-//       data-wt-sesschg-revert、data-wt-sesschg-status、data-wt-sesschg-diff
+//       data-wt-sesschg-revert、data-wt-sesschg-diff、data-wt-sesschg-history、
+//       data-wt-sesschg-clear
 ```
 
 - [ ] **Step 2: 接线 workspace-browser.js**
@@ -176,8 +186,9 @@ Expected: 全绿；构建成功。
 
 - [ ] "会话变更" tab 出现（变更之后），标题带未处理计数（如"会话变更 3"）；无待处理时不带数字
 - [ ] 每条显示文件名/时间/工具；展开可见 before/after
-- [ ] 采用 → 该条消失 + 计数减一；撤回 → 文件恢复 + 该条消失 + 计数减一
-- [ ] 已操作记录不再出现在列表（直接删除语义）
+- [ ] 采用 → 该条移出 pending + 计数减一，并出现在下方"已处理历史"（已采用）
+- [ ] 撤回 → 文件恢复 + 该条移出 pending + 计数减一，历史区出现"已撤回"
+- [ ] 历史区最多 10 条（超出丢最旧）；"清除"按钮清空历史区
 - [ ] 与"变更"tab 并存：撤回后 git 变更列表出现新修改（解耦验证）
 - [ ] 无记录时显示空态提示
 
@@ -196,8 +207,9 @@ git push "https://x-access-token:${TOKEN}@github.com/g1998815/dsh-workspace-tool
 
 - [ ] `node --test` 全绿（93 + 新增用例）。
 - [ ] write/edit 工具修改文件 → 会话变更记录生成（before/after/步骤归属）。
-- [ ] 采用 / 撤回可用；撤回恢复 before（新增文件删除）；**操作后记录删除（仅存 pending）**；幂等。
+- [ ] 采用 / 撤回可用；撤回恢复 before（新增文件删除）；**操作后记录移入已处理历史（每会话 ≤10 条，超出丢最旧）**；幂等。
 - [ ] tab 标题显示未处理计数（"会话变更 N"），随操作实时更新。
+- [ ] 已处理历史区展示（已采用/已撤回徽标 + 文件名 + 时间）；"清除"按钮清空。
 - [ ] 与 git 解耦：不产生 git 提交；撤回作为新修改反映到"变更"tab。
 - [ ] GUI："会话变更"tab 展示、展开 diff、操作反馈、空态。
 - [ ] 推送 GitHub main。
