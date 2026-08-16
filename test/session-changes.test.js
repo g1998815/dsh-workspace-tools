@@ -204,8 +204,11 @@ test("captureIntents+captureTurnMap+captureResults：完整流组装 Record，ne
   const emits = new Map();
   const files = new Map();
   const ctx = {
-    waterfall: (name, fn) => waterFalls.set(name, fn),
-    on: (name, fn) => emits.set(name, fn),
+    on: (name, fn) => {
+      // 与真实 Cordis 一致：waterfall 监听器也用 ctx.on 注册（prepend 存前）
+      if (name.startsWith("fs/")) waterFalls.set(name, fn);
+      else emits.set(name, fn);
+    },
     fs: {
       readText: async (t) => {
         if (!files.has(t.targetKey)) throw Object.assign(new Error("missing"), { code: "FS_NOT_FOUND" });
@@ -284,8 +287,10 @@ function rpcHarness({ files = new Map() } = {}) {
     subprocess: { spawnTerminal: async () => { throw new Error("unused"); } },
     sessions: new Map(),
     effect: () => () => {},
-    waterfall: (name, fn) => waterfalls.set(name, fn),
-    on: (name, fn) => emits.set(name, fn),
+    on: (name, fn) => {
+      if (name.startsWith("fs/")) waterfalls.set(name, fn);
+      else emits.set(name, fn);
+    },
   };
   apply(ctx);
   return {
