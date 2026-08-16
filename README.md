@@ -1,19 +1,43 @@
 # dsh-workspace-tools
 
-DSH（DeepSeek Harness）第三方插件：右侧工具侧边栏 —— Git 变更 / 文件浏览器 / PTY 控制台。
+DSH（DeepSeek Harness）第三方插件：**右侧原生工具侧边栏** —— 文件系统浏览器 / Git 变更与 diff / 会话变更 / PTY 控制台，一站式补全 DSH 工作台。
 
-![界面预览](docs/diff.png)
+## ✨ 亮点
 
-## 功能
+- **上手即用**：`npm install` + 一条构建 + 一条安装脚本，右侧栏即刻拥有文件、git、diff、终端四大工具；不遮蔽主界面（与页面同层的 grid 布局），收起可缩成 56px 图标 rail。
+- **Windows & macOS 一致可用**：Windows 直连 `node-pty`（conpty）跑起真实 PTY 终端，PowerShell/cmd 皆可；文件、git、提交、撤回全套可用。
+- **全链路安全**：RPC 全部 fail-closed（`sessionId` + cwd 双重校验），只回环监听，diff/提交/撤回都在工作区路径内执行。
+- **跟随 DSH 主题**：深浅色主题自动适配，终端 xterm 配色、侧边栏、浮窗全部读 DSH 语义色 token，无割裂感。
 
-- **文件**：懒加载文件树（隐藏 dotfiles）、过滤、单击选中、右键菜单（打开预览 / 复制绝对路径 / 发送到对话框）。
-- **变更**：Git 变更列表（修改/新增/删除/重命名/未跟踪）、diff 窗口（可拖拽/缩放/搜索）、提交（单个或全部，必填提交消息）、提交历史（回退 `--mixed` / 查看提交详情 diff）。
-- **预览**：文本（行号 + 语法高亮 + 搜索）与图片；窗口居中打开、可拖拽、可缩放。
-- **会话**：会话列表（与 DSH 左侧栏同源）。
-- **控制台**：底部 PTY 终端面板（多标签 xterm + WebSocket 输出流 + RPC 输入），可拖高、可收起（会话保留）。
-  - POSIX：`ctx.subprocess.spawnTerminal`；Windows（M5-W）：dsh-subprocess 的 win32 inspector 未实现 → 直连 `node-pty`（conpty），shell 探测 pwsh 7 → Windows PowerShell → cmd。
-- **主题**：终端与面板跟随 DSH 主题（读 `--dsw-alias-*` CSS 变量，`body[data-ds-dark-theme]` 切换时热更新 xterm 配色）。
-- **布局**：右侧栏可收起为 56px 图标 rail（文件/变更/会话/终端），与主页面同层不遮挡；控制台与主内容同层。
+## 功能总览
+
+### 📁 文件系统浏览器
+
+懒加载文件树（隐藏 dotfiles）、一键过滤、单击选中，右键菜单直达**预览 / 复制绝对路径 / 发送到对话框**。
+
+![文件系统](docs/screenshot-files.png)
+
+### 🔀 Git 变更与 diff
+
+Git 变更列表（修改 / 新增 / 删除 / 重命名 / 未跟踪，目录分组），点击文件弹出行级 diff 浮窗——**可拖拽 / 缩放 / 搜索定位**；变更可勾选提交（单个或全部，必填提交消息），完整提交历史支持安全回退（`--mixed`）与提交详情 diff。
+
+![Git 变更](docs/screenshot-git.png)
+
+### 👁 diff 展示
+
+统一 diff 浮窗组件：红删绿加、hunk 高亮、行号、全文搜索 + 高亮定位；文本预览（行号 + 语法高亮 + 搜索）与图片预览共用。
+
+![diff 展示](docs/screenshot-diff.png)
+
+### 💬 会话变更
+
+按「会话 → 对话 → 文件」记录 agent 每次 write/edit 的 before/after 快照，支持逐条**采用 / 撤回**（撤回恢复原内容、新增文件直接删除），与 git 完全解耦。
+
+### 🖥 PTY 控制台
+
+底部多标签 xterm 面板：WebSocket 输出流 + RPC 输入，可拖高、可收起（会话保留）。
+- **POSIX**：`ctx.subprocess.spawnTerminal`
+- **Windows**：dsh-subprocess 未实现 win32 inspector → 直连 `node-pty`（conpty），shell 探测 pwsh 7 / Windows PowerShell / cmd
 
 ## 技术要点
 
