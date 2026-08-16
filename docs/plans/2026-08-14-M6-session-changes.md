@@ -24,21 +24,23 @@
 ## 数据结构（host 内存，`lib/services/session-changes.js`）
 
 ```js
-// 记录（不可变）：一次 write/edit 工具调用 → 一条
+// 记录（不可变）：一次 write/edit 工具调用 → 一条（仅保留 pending 状态）
 { callId, tool: "write"|"edit", file: displayPath, abs: processPath,
   before: string|null /* null=文件原本不存在（新增） */, after: string,
-  sessionId, step: number, at: epochMs, status: "pending"|"adopted"|"reverted" }
+  sessionId, step: number, at: epochMs }
 
 // store：Map<sessionId, Array<Record>>；按 step 升序
 ```
+
+> **用户裁定（2026-08-16）**：**已采用/已撤回的记录直接删除**，不保留历史——`adopt`/`revert` 成功后从 store 移除该记录（幂等：对不存在记录操作返回 ok）。store 内只存在"未处理"（pending）记录。撤回动作本身是 host 直接写文件（不走工具），不会形成新记录循环。
 
 ## RPC 端点（`lib/index.js` 追加，沿用 `(endpoint,payload)` 信封 + guardCwd）
 
 | 端点 | payload | 返回 |
 |---|---|---|
-| `sessionChanges.list` | `{sessionId, cwd}` | `{items: Record[]}`（当前会话全部记录） |
-| `sessionChanges.adopt` | `{sessionId, cwd, callId}` | `{ok:true}`；已非 pending 幂等 |
-| `sessionChanges.revert` | `{sessionId, cwd, callId}` | `{ok:true}`；写回 before（新增文件→`fs.rm`）；失败结构化错误 |
+| `sessionChanges.list` | `{sessionId, cwd}` | `{items: Record[]}`（当前会话**全部 pending** 记录） |
+| `sessionChanges.adopt` | `{sessionId, cwd, callId}` | `{ok:true}`；记录删除（幂等） |
+| `sessionChanges.revert` | `{sessionId, cwd, callId}` | `{ok:true}`；写回 before（新增文件→`fs.rm`）后删除记录（幂等）；失败结构化错误 |
 
 > `revert` 后记录 status → "reverted"；再次操作幂等。撤回动作本身是文件修改（下次 write/edit 会再捕获为新记录，符合"撤回反映到 git 变更"）。
 
@@ -53,17 +55,17 @@
 
 **Interfaces:**
 - Produces:
-  - `createSessionChangesStore()` → `{ list(sessionId), push(sessionId, rec), find(sessionId, callId), setStatus(sessionId, callId, status) }`
+  - `createSessionChangesStore()` → `{ list(sessionId), push(sessionId, rec), find(sessionId, callId), remove(sessionId, callId) }`
   - `captureIntents(ctx, store)`：注册 write/edit-intent 监听（读 before，记 pending by callId）
   - `captureResults(ctx, store)`：注册 tools/result 监听（匹配 pending → 组装 Record → push）
-  - `revertRecord(store, sessionId, callId, { fs, path })`：写回/删除
+  - `revertRecord(store, sessionId, callId, { fs, path })`：写回/删除；成功后 `remove`
 - Consumes: `ctx.waterfall` / `ctx.on` / `ctx.fs`（readText/processPath）、`node:fs/promises`（rm）。
 
 - [ ] **Step 1: 写失败测试（纯逻辑）**
 
 ```js
-// test/session-changes.test.js —— 记录模型/状态机/组装（无 Node 依赖的纯函数优先）
-// 用例：push+list 顺序；同文件多次 → 多条；step 自增；setStatus pending→adopted/reverted；
+// test/session-changes.test.js —— 记录模型/组装/删除语义（无 Node 依赖的纯函数优先）
+// 用例：push+list 顺序；同文件多次 → 多条；step 自增；remove 幂等；
 //      revertRecord 语义（before null → 删除；before 文本 → 写回）用 fake fs 验证。
 ```
 
@@ -113,11 +115,12 @@ git commit -m "feat: session-changes capture layer (write/edit intents + tools/r
 
 **Interfaces:**
 - Produces:
-  - `SessionChanges({ cwd, sessionId, rpc })`：
-    - 加载 `sessionChanges.list` → 会话分组（当前会话一组，标题含会话 id 缩写 + 步骤数）
-    - 每条：状态徽标（待处理/已采用/已撤回）+ 文件名 + 时间 + 工具
-    - 展开 → before/after diff 视图（复用 DiffLines 或简单双栏；无 diff 时显示文件内容变化摘要）
-    - 按钮：**采用**（pending 时）、**撤回**（pending 时）；操作后局部刷新
+  - `SessionChanges({ cwd, sessionId, rpc, onCountChange })`：
+    - 加载 `sessionChanges.list` → 当前会话 pending 记录（步骤升序）
+    - 每条：文件名 + 时间 + 工具；展开 → before/after diff 视图（复用 DiffLines 或简单双栏；无 diff 时显示文件内容变化摘要）
+    - 按钮：**采用**、**撤回**（操作成功 → 本地移除该条 + `onCountChange` 更新计数）
+    - `onCountChange(n)`：把当前 pending 条数回传父组件 → tab 标题显示
+  - 空态：无 pending 时显示"没有待处理的会话变更"（此时标题不带数字）
 - Consumes: `callRpc`、`DiffLines`、时间格式化（git-history-client 的 relativeTime 或本地）。
 
 - [ ] **Step 1: 写 SessionChanges 组件**（结构契约）
@@ -131,7 +134,10 @@ git commit -m "feat: session-changes capture layer (write/edit intents + tools/r
 - [ ] **Step 2: 接线 workspace-browser.js**
 
 - TABS 数组插入 `{ id: "sessionChanges", label: "会话变更" }`（变更之后、会话之前）
-- tabpanel 分支：`tab === "sessionChanges" ? jsx(SessionChanges, {cwd, sessionId: current, rpc}) : ...`
+- 新 state `sessionChangeCount`（默认 0）
+- tabpanel 分支：`tab === "sessionChanges" ? jsx(SessionChanges, {cwd, sessionId: current, rpc, onCountChange: setSessionChangeCount}) : ...`
+- 页签标题：`t.id === "sessionChanges" && sessionChangeCount > 0 ? \`会话变更 ${sessionChangeCount}\` : t.label`（与"变更 N"同款）
+- 进入/展开 tab 时刷新计数（SessionChanges 挂载即 list 一次回调 onCountChange）
 
 - [ ] **Step 3: 语法 + 构建 + 全量测试**
 
@@ -168,9 +174,10 @@ Expected: 全绿；构建成功。
 
 - [ ] **Step 3: GUI 手动验收**
 
-- [ ] "会话变更" tab 出现（变更之后），显示当前会话记录
-- [ ] 每条显示状态/文件名/时间；展开可见 before/after
-- [ ] 采用 → 状态变已采用；撤回 → 文件恢复 + 状态变已撤回
+- [ ] "会话变更" tab 出现（变更之后），标题带未处理计数（如"会话变更 3"）；无待处理时不带数字
+- [ ] 每条显示文件名/时间/工具；展开可见 before/after
+- [ ] 采用 → 该条消失 + 计数减一；撤回 → 文件恢复 + 该条消失 + 计数减一
+- [ ] 已操作记录不再出现在列表（直接删除语义）
 - [ ] 与"变更"tab 并存：撤回后 git 变更列表出现新修改（解耦验证）
 - [ ] 无记录时显示空态提示
 
@@ -189,7 +196,8 @@ git push "https://x-access-token:${TOKEN}@github.com/g1998815/dsh-workspace-tool
 
 - [ ] `node --test` 全绿（93 + 新增用例）。
 - [ ] write/edit 工具修改文件 → 会话变更记录生成（before/after/步骤归属）。
-- [ ] 采用 / 撤回可用；撤回恢复 before（新增文件删除）；幂等。
+- [ ] 采用 / 撤回可用；撤回恢复 before（新增文件删除）；**操作后记录删除（仅存 pending）**；幂等。
+- [ ] tab 标题显示未处理计数（"会话变更 N"），随操作实时更新。
 - [ ] 与 git 解耦：不产生 git 提交；撤回作为新修改反映到"变更"tab。
 - [ ] GUI："会话变更"tab 展示、展开 diff、操作反馈、空态。
 - [ ] 推送 GitHub main。
