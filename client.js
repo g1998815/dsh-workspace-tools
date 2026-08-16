@@ -1930,6 +1930,36 @@ function ToolBadge({ tool }) {
     children: tool
   });
 }
+function RevertIcon() {
+  return (0, import_jsx_runtime9.jsx)("svg", {
+    viewBox: "0 0 1024 1024",
+    width: 14,
+    height: 14,
+    style: { display: "block", flexShrink: 0 },
+    children: (0, import_jsx_runtime9.jsx)("path", {
+      d: "M381.696 248.2688a51.2 51.2 0 0 1 80.3584 63.36l-2.6112 3.3024-66.5344 77.5936h236.1088c106.5728 0 187.0848 89.216 190.1056 206.8992l0.0768 6.8096c0 118.6816-78.464 209.4848-184.064 212.864l-6.1184 0.1024H420.608a51.2 51.2 0 0 1-3.84-102.272l3.84-0.128h208.4352C678.1952 716.8 716.8 673.2288 716.8 606.2336c0-65.0752-36.4544-108.544-83.2-111.1808l-4.5824-0.128H281.6c-42.4192 0-65.8944-48.2304-41.3184-81.4336l2.432-3.072 139.008-162.1504z",
+      fill: "currentColor"
+    })
+  });
+}
+function AdoptIcon() {
+  return (0, import_jsx_runtime9.jsx)("svg", {
+    viewBox: "0 0 1024 1024",
+    width: 14,
+    height: 14,
+    style: { display: "block", flexShrink: 0 },
+    children: [
+      (0, import_jsx_runtime9.jsx)("path", {
+        d: "M449.998901 696.046736 269.13567 515.369747 337.436242 446.99959 449.998901 559.448662 685.163875 324.520071 753.466494 392.890228 449.998901 696.046736Z",
+        fill: "currentColor"
+      }),
+      (0, import_jsx_runtime9.jsx)("path", {
+        d: "M511.301082 67.156516c-244.732887 0-443.1274 198.394513-443.1274 443.1274s198.394513 443.1274 443.1274 443.1274 443.1274-198.395536 443.1274-443.1274S756.033969 67.156516 511.301082 67.156516zM511.301082 888.575658c-208.925357 0-378.292766-169.367409-378.292766-378.292766s169.367409-378.291742 378.292766-378.291742c208.925357 0 378.291742 169.367409 378.291742 378.291742S720.226438 888.575658 511.301082 888.575658z",
+        fill: "currentColor"
+      })
+    ]
+  });
+}
 function PendingItem({ rec, busy, onView, onAdopt, onRevert }) {
   const { dir, base } = splitPath(rec.file);
   const opBusy = busy.has(rec.callId);
@@ -1971,24 +2001,28 @@ function PendingItem({ rec, busy, onView, onAdopt, onRevert }) {
           (0, import_jsx_runtime9.jsx)("button", {
             type: "button",
             "data-wt-sesschg-adopt": true,
+            title: "\u91C7\u7528",
+            "aria-label": "\u91C7\u7528",
             disabled: opBusy,
             onClick: (ev) => {
               ev.stopPropagation();
               onAdopt(rec);
             },
-            style: { ...btnStyle, color: "var(--dsw-alias-state-success-primary, #22c55e)", borderColor: "var(--dsw-alias-border-l2, #444)" },
-            children: "\u91C7\u7528"
+            style: { ...btnStyle, padding: "2px 5px", color: "var(--dsw-alias-state-success-primary, #22c55e)", borderColor: "var(--dsw-alias-border-l2, #444)" },
+            children: (0, import_jsx_runtime9.jsx)(AdoptIcon, {})
           }),
           (0, import_jsx_runtime9.jsx)("button", {
             type: "button",
             "data-wt-sesschg-revert": true,
+            title: "\u64A4\u56DE",
+            "aria-label": "\u64A4\u56DE",
             disabled: opBusy,
             onClick: (ev) => {
               ev.stopPropagation();
               onRevert(rec);
             },
-            style: { ...btnStyle, color: "var(--dsw-alias-state-warn-primary, #f59e0b)", borderColor: "var(--dsw-alias-border-l2, #444)" },
-            children: "\u64A4\u56DE"
+            style: { ...btnStyle, padding: "2px 5px", color: "var(--dsw-alias-state-warn-primary, #f59e0b)", borderColor: "var(--dsw-alias-border-l2, #444)" },
+            children: (0, import_jsx_runtime9.jsx)(RevertIcon, {})
           })
         ]
       })

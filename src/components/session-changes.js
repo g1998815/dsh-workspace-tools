@@ -55,6 +55,40 @@ function ToolBadge({ tool }) {
   });
 }
 
+// 撤回图标（分支还原箭头）；fill 用 currentColor → 由按钮 style.color 决定（深色模式可用）
+function RevertIcon() {
+  return jsx("svg", {
+    viewBox: "0 0 1024 1024",
+    width: 14,
+    height: 14,
+    style: { display: "block", flexShrink: 0 },
+    children: jsx("path", {
+      d: "M381.696 248.2688a51.2 51.2 0 0 1 80.3584 63.36l-2.6112 3.3024-66.5344 77.5936h236.1088c106.5728 0 187.0848 89.216 190.1056 206.8992l0.0768 6.8096c0 118.6816-78.464 209.4848-184.064 212.864l-6.1184 0.1024H420.608a51.2 51.2 0 0 1-3.84-102.272l3.84-0.128h208.4352C678.1952 716.8 716.8 673.2288 716.8 606.2336c0-65.0752-36.4544-108.544-83.2-111.1808l-4.5824-0.128H281.6c-42.4192 0-65.8944-48.2304-41.3184-81.4336l2.432-3.072 139.008-162.1504z",
+      fill: "currentColor",
+    }),
+  });
+}
+
+// 采用图标（绿圈对勾）；fill 用 currentColor → 由按钮 style.color 决定
+function AdoptIcon() {
+  return jsx("svg", {
+    viewBox: "0 0 1024 1024",
+    width: 14,
+    height: 14,
+    style: { display: "block", flexShrink: 0 },
+    children: [
+      jsx("path", {
+        d: "M449.998901 696.046736 269.13567 515.369747 337.436242 446.99959 449.998901 559.448662 685.163875 324.520071 753.466494 392.890228 449.998901 696.046736Z",
+        fill: "currentColor",
+      }),
+      jsx("path", {
+        d: "M511.301082 67.156516c-244.732887 0-443.1274 198.394513-443.1274 443.1274s198.394513 443.1274 443.1274 443.1274 443.1274-198.395536 443.1274-443.1274S756.033969 67.156516 511.301082 67.156516zM511.301082 888.575658c-208.925357 0-378.292766-169.367409-378.292766-378.292766s169.367409-378.291742 378.292766-378.291742c208.925357 0 378.291742 169.367409 378.291742 378.291742S720.226438 888.575658 511.301082 888.575658z",
+        fill: "currentColor",
+      }),
+    ],
+  });
+}
+
 // 待处理单条：工具徽标 + 路径（目录前缀次要色）+ 时间 + 采用/撤回。
 // 点击整行打开 git 同款 diff 弹窗（DiffWindow/DiffLines 渲染 before→after 差异）——
 // 与「变更」页签点击文件打开的弹窗及其中 diff 文本格式完全一致。
@@ -99,24 +133,28 @@ function PendingItem({ rec, busy, onView, onAdopt, onRevert }) {
           jsx("button", {
             type: "button",
             "data-wt-sesschg-adopt": true,
+            title: "采用",
+            "aria-label": "采用",
             disabled: opBusy,
             onClick: (ev) => {
               ev.stopPropagation();
               onAdopt(rec);
             },
-            style: { ...btnStyle, color: "var(--dsw-alias-state-success-primary, #22c55e)", borderColor: "var(--dsw-alias-border-l2, #444)" },
-            children: "采用",
+            style: { ...btnStyle, padding: "2px 5px", color: "var(--dsw-alias-state-success-primary, #22c55e)", borderColor: "var(--dsw-alias-border-l2, #444)" },
+            children: jsx(AdoptIcon, {}),
           }),
           jsx("button", {
             type: "button",
             "data-wt-sesschg-revert": true,
+            title: "撤回",
+            "aria-label": "撤回",
             disabled: opBusy,
             onClick: (ev) => {
               ev.stopPropagation();
               onRevert(rec);
             },
-            style: { ...btnStyle, color: "var(--dsw-alias-state-warn-primary, #f59e0b)", borderColor: "var(--dsw-alias-border-l2, #444)" },
-            children: "撤回",
+            style: { ...btnStyle, padding: "2px 5px", color: "var(--dsw-alias-state-warn-primary, #f59e0b)", borderColor: "var(--dsw-alias-border-l2, #444)" },
+            children: jsx(RevertIcon, {}),
           }),
         ],
       }),
